@@ -1,0 +1,25 @@
+# Desenvolvimento com hot reload: alterações no código refletem no navegador
+# Uso: docker compose -f docker-compose.dev.yml up --build
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    volumes:
+      # Código local montado para hot reload
+      - .:/app
+      # Evita sobrescrever node_modules do container com o do host
+      - node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev"
+    env_file:
+      - .env
+    environment:
+      - VITE_USE_POLLING=true
+      - VITE_DISABLE_HMR=true
+    restart: unless-stopped
+
+volumes:
+  node_modules:

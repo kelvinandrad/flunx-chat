@@ -1,0 +1,17 @@
+# Imagem de desenvolvimento com hot reload (Vite)
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copia apenas dependências para aproveitar cache de camadas
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copia o resto do projeto (será sobrescrito pelo volume em runtime)
+COPY . .
+
+EXPOSE 8080
+
+# Em runtime o volume monta o código; node_modules fica no volume nomeado.
+# O comando real (npm install + npm run dev) é definido no docker-compose.
+CMD ["npm", "run", "dev"]

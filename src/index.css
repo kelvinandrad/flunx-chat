@@ -1,0 +1,206 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 220 20% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+
+    --primary: 168 76% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 15% 95%;
+    --secondary-foreground: 220 15% 30%;
+
+    --muted: 210 15% 95%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 168 76% 36%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 15% 90%;
+    --input: 210 15% 90%;
+    --ring: 168 76% 36%;
+
+    --radius: 0.625rem;
+
+    /* mixed (Médio): menu e topbar escuros, páginas claras — topbar igual ao menu */
+    --sidebar-background: 220 25% 10%;
+    --sidebar-foreground: 210 15% 70%;
+    --sidebar-primary: 168 70% 45%;
+    --sidebar-primary-foreground: 220 25% 10%;
+    --sidebar-accent: 220 20% 16%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 220 20% 15%;
+    --sidebar-ring: 168 70% 45%;
+
+    --topbar-background: 0 0% 100%;
+    --topbar-border: 210 15% 92%;
+
+    --chart-1: 168 76% 36%;
+    --chart-2: 168 60% 50%;
+    --chart-3: 168 50% 60%;
+    --chart-4: 210 20% 70%;
+    --chart-5: 210 15% 80%;
+
+    --success: 158 64% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+  }
+
+  /* theme-light (Claro): menu e topbar mesmo background, páginas claras */
+  html.theme-light {
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 20% 20%;
+    --sidebar-primary: 168 76% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 15% 90%;
+    --sidebar-accent-foreground: 220 20% 15%;
+    --sidebar-border: 210 15% 88%;
+    --sidebar-ring: 168 76% 36%;
+    --topbar-background: 0 0% 100%;
+    --topbar-border: 210 15% 92%;
+  }
+
+  /* theme-mixed (Médio): menu e topbar idênticos ao tema escuro, conteúdo igual ao claro */
+  html.theme-mixed {
+    --sidebar-background: 220 22% 8%;
+    --sidebar-foreground: 210 15% 70%;
+    --sidebar-primary: 168 70% 45%;
+    --sidebar-primary-foreground: 220 25% 6%;
+    --sidebar-accent: 220 20% 12%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 220 20% 12%;
+    --sidebar-ring: 168 70% 45%;
+    --topbar-background: 220 22% 8%;
+    --topbar-border: 220 20% 12%;
+  }
+
+  .dark {
+    --background: 220 25% 6%;
+    --foreground: 210 20% 92%;
+
+    --card: 220 20% 9%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 220 20% 9%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 168 70% 45%;
+    --primary-foreground: 220 25% 6%;
+
+    --secondary: 220 20% 14%;
+    --secondary-foreground: 210 15% 75%;
+
+    --muted: 220 20% 14%;
+    --muted-foreground: 210 10% 55%;
+
+    --accent: 168 70% 45%;
+    --accent-foreground: 220 25% 6%;
+
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 15%;
+    --input: 220 20% 15%;
+    --ring: 168 70% 45%;
+
+    --sidebar-background: 220 22% 8%;
+    --sidebar-foreground: 210 15% 70%;
+    --sidebar-primary: 168 70% 45%;
+    --sidebar-primary-foreground: 220 25% 6%;
+    --sidebar-accent: 220 20% 12%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 220 20% 12%;
+    --sidebar-ring: 168 70% 45%;
+
+    --topbar-background: 220 22% 8%;
+    --topbar-border: 220 20% 12%;
+
+    --chart-1: 168 70% 45%;
+    --chart-2: 168 55% 55%;
+    --chart-3: 168 45% 65%;
+    --chart-4: 210 20% 40%;
+    --chart-5: 210 15% 30%;
+
+    --success: 158 60% 45%;
+    --warning: 38 85% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+@layer components {
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:border-primary/20;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors;
+  }
+
+  .nav-item-active {
+    @apply bg-primary/10 text-primary;
+  }
+
+  .nav-item-inactive {
+    @apply text-muted-foreground hover:text-foreground hover:bg-secondary;
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.15);
+  }
+
+  .dark .glow-accent {
+    box-shadow: 0 0 30px hsl(var(--primary) / 0.25);
+  }
+}
