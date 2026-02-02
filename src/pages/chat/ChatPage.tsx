@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ConversationListPanel, Channel } from "./components/ConversationListPanel";
 import { Conversation } from "./components/ConversationItem";
@@ -72,7 +73,11 @@ function mapMessageListItemToMessage(msg: MessageListItem): Message {
 }
 
 export default function ChatPage() {
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>("all");
+  const [searchParams] = useSearchParams();
+  const channelFromUrl = searchParams.get("channel");
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
+    channelFromUrl || "all"
+  );
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
   const [isConversationsColumnOpen, setIsConversationsColumnOpen] = useState(true);
@@ -99,6 +104,11 @@ export default function ChatPage() {
   const messages: Message[] = allMessagesRaw.map(mapMessageListItemToMessage).reverse();
 
   const { send } = useSendMessage(selectedConversationId ?? null);
+
+  // Pre-selecionar canal vindo da URL (?channel=id)
+  useEffect(() => {
+    if (channelFromUrl) setSelectedChannelId(channelFromUrl);
+  }, [channelFromUrl]);
 
   // Reset older messages when conversation changes
   useEffect(() => {

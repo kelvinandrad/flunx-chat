@@ -61,6 +61,28 @@ export async function listMessages(
   return data as ListMessagesResponse;
 }
 
+export type SyncInboxResponse = {
+  success: boolean;
+  chats_processed: number;
+  contacts_created: number;
+  conversations_created: number;
+};
+
+export async function syncInbox(
+  inboxId: string,
+  accessToken: string
+): Promise<SyncInboxResponse> {
+  const res = await fetch(`${CHANNELS_API_URL}/inboxes/${inboxId}/sync`, {
+    method: "POST",
+    headers: getAuthHeaders(accessToken),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+  }
+  return data as SyncInboxResponse;
+}
+
 export async function sendMessage(
   conversationId: string,
   body: SendMessageBody,

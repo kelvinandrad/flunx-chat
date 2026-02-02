@@ -6,21 +6,23 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Plus,
-  Settings,
   CheckCircle2,
   AlertTriangle,
   XCircle,
   Loader2,
   Zap,
-  ArrowRight,
   QrCode,
   Trash2,
   RefreshCw,
+  Download,
   Users,
   MessageSquare,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useChannels } from "@/hooks/useChannels";
+import { useAuth } from "@/contexts/AuthContext";
+import { syncInbox } from "@/lib/chat-api";
+import { toast } from "sonner";
 import { CreateChannelDialog } from "./CreateChannelDialog";
 import { RefreshQRDialog } from "./RefreshQRDialog";
 import { DeleteChannelDialog } from "./DeleteChannelDialog";
@@ -84,13 +86,8 @@ function formatDate(iso: string) {
   }
 }
 
-/** No flunx-chat, "Configurar" leva para as conversas do inbox (mesma tela que v2, destino diferente). */
-function getChannelDetailPath(channelId: string) {
-  return `/inboxes/${channelId}/conversations`;
-}
-
 export default function ChannelsList() {
-  const navigate = useNavigate();
+  const { session } = useAuth();
   const { channels, isLoading, invalidate } = useChannels();
   const [createOpen, setCreateOpen] = useState(false);
   const [refreshQROpen, setRefreshQROpen] = useState(false);
@@ -103,6 +100,7 @@ export default function ChannelsList() {
   const [reconnectInboxId, setReconnectInboxId] = useState<string | null>(null);
   const [reconnectChannelName, setReconnectChannelName] = useState("");
   const [reconnectIsConnected, setReconnectIsConnected] = useState(false);
+  const [syncingInboxId, setSyncingInboxId] = useState<string | null>(null);
 
   const openRefreshQR = (inboxId: string, channelName: string) => {
     setRefreshQRInboxId(inboxId);
@@ -140,6 +138,23 @@ export default function ChannelsList() {
     setReconnectInboxId(null);
     setReconnectChannelName("");
     setReconnectIsConnected(false);
+  };
+
+  const handleSync = async (inboxId: string) => {
+    if (!session?.access_token) return;
+    setSyncingInboxId(inboxId);
+    try {
+      const result = await syncInbox(inboxId, session.access_token);
+      await invalidate();
+      toast.success(
+        `Sincronização concluída: ${result.conversations_created} conversas criadas, ${result.contacts_created} contatos criados.`
+      );
+    } catch (e) {
+      console.error("Erro ao sincronizar:", e);
+      toast.error(e instanceof Error ? e.message : "Erro ao sincronizar conversas");
+    } finally {
+      setSyncingInboxId(null);
+    }
   };
 
   const connectedCount = channels.filter((c) => c.connection_status === "connected").length;
@@ -233,7 +248,6 @@ export default function ChannelsList() {
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {channels.map((channel) => {
               const Icon = getChannelIcon(channel.channel_type);
-              const detailPath = getChannelDetailPath(channel.id);
               const isConnected = channel.connection_status === "connected";
               const hasProfile = isConnected && channel.whatsapp_profile_name;
               return (
@@ -267,17 +281,6 @@ export default function ChannelsList() {
                           <div className="mt-1.5">{StatusBadge({ status: channel.connection_status })}</div>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 rounded-lg opacity-70 transition-opacity hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(detailPath);
-                        }}
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
                     </div>
 
                     {/* Stats: Contatos e Conversas (se conectado) */}
@@ -325,18 +328,9 @@ export default function ChannelsList() {
 
                     <div className="mt-4 flex flex-col gap-2 border-t border-border/60 pt-4">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                        <span className="text-xs text-muted-foreground truncate">
                           {channel.evolution_instance_name}
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="gap-1.5 rounded-lg text-primary hover:bg-primary/10"
-                          onClick={() => navigate(detailPath)}
-                        >
-                          Configurar
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </Button>
                       </div>
                       <div className="flex gap-2 flex-wrap">
                         {/* Botão Conectar (para não conectados) */}
@@ -361,6 +355,23 @@ export default function ChannelsList() {
                           >
                             <RefreshCw className="h-3.5 w-3.5" />
                             Reconectar
+                          </Button>
+                        )}
+                        {/* Botão Sincronizar (conversas e mensagens) */}
+                        {channel.channel_type === "whatsapp" && isConnected && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 rounded-lg border-muted-foreground/30 text-muted-foreground hover:bg-muted/50"
+                            onClick={() => handleSync(channel.id)}
+                            disabled={syncingInboxId === channel.id}
+                          >
+                            {syncingInboxId === channel.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Download className="h-3.5 w-3.5" />
+                            )}
+                            Sincronizar
                           </Button>
                         )}
                         {/* Botão Excluir */}

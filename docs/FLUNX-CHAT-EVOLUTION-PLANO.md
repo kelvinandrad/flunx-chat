@@ -495,7 +495,7 @@ Todas as rotas abaixo exigem **Authorization: Bearer &lt;JWT Supabase&gt;** (401
 **Objetivo:** Substituir mocks por dados do Supabase e pela API de envio.
 
 **Contexto do front atual (análise):**
-- **Duas UIs de chat:** (1) **ChatPage (`/chat`)** — uma única página com dropdown de canais, lista de conversas, área de mensagens e painel do contato (notas, propostas, agendamentos, lembretes); hoje 100% mock (`MOCK_CHANNELS`, `MOCK_CONVERSATIONS`, `MOCK_MESSAGES`); envio simulado. (2) **Fluxo por rotas** — InboxList (`/inboxes`) → ConversationList (`/inboxes/:inboxId/conversations`) → ConversationView (`/inboxes/:inboxId/conversations/:conversationId`); as três telas usam mocks; ConversationView tem input mas não envia de verdade.
+- **UI unificada:** Apenas **ChatPage (`/chat`)** — dropdown de canais, lista de conversas, área de mensagens e painel do contato (notas, propostas, agendamentos, lembretes). Aceita `?channel=<id>` para pré-selecionar canal (ex.: vindo de `/canais` → Configurar). O fluxo antigo por rotas (`/inboxes`, `/inboxes/:id/conversations`, `/inboxes/:id/conversations/:id`) foi removido; usa-se `/canais` para gerenciar canais e `/chat` para conversar.
 - **Canais:** `useChannels()` já lê `chat_inboxes` via Supabase (e Realtime); usado em ChannelsList (`/canais`). A flunx-channels-api é chamada em CreateChannelDialog, ReconnectDialog, etc. com `VITE_CHANNELS_API_URL`; para **conversas e mensagens** a API exige **Authorization: Bearer &lt;JWT Supabase&gt;** — o front deve usar `session.access_token` (ex.: `supabase.auth.getSession()` ou contexto de auth) em todas as chamadas a `GET /inboxes/:inboxId/conversations`, `GET /conversations/:id/messages` e `POST /conversations/:id/messages`.
 - **Tipos:** Contratos da Fase 2 e tipos em `src/lib/chat-api-types.ts`; mapear `ConversationListItem` → `Conversation` (ConversationItem/ChatPage), `MessageListItem` → `Message` (MessageBubble), `ChatInbox` → `Channel` (ConversationListPanel).
 
@@ -539,7 +539,7 @@ Todas as rotas abaixo exigem **Authorization: Bearer &lt;JWT Supabase&gt;** (401
 | Dizer à Evolution para onde enviar eventos | ✅ (Fase 1 implementada) | 1 ✅ |
 | Receber mensagem no backend | ✅ (Fase 1 implementada) | 1 ✅ |
 | Modelo contact/conversation/message | ✅ Tabelas + schema alinhado (incl. chat_messages status/sender_type) | 1 ✅ |
-| Listar conversas/mensagens | ✅ GET /inboxes/:id/conversations, GET /conversations/:id/messages + front (InboxList, ConversationList, ConversationView, ChatPage) | 2 + 3 ✅ |
+| Listar conversas/mensagens | ✅ GET /inboxes/:id/conversations, GET /conversations/:id/messages + ChatPage | 2 + 3 ✅ |
 | Enviar mensagem (atendente) | ✅ POST /conversations/:id/messages + front com Bearer | 2 + 3 ✅ |
 | Realtime no chat | ✅ Supabase Realtime em chat_messages e chat_conversations (useMessages, useConversations) | 3 ✅ |
 | Carregar mais mensagens (paginação) | ⚠️ API suporta (next_cursor); front sem botão "Carregar mais" | 3 (melhoria) |

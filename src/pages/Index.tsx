@@ -43,11 +43,11 @@ const Index = () => {
         <Card>
           <CardHeader>
             <CardTitle>Começar</CardTitle>
-            <CardDescription>Acesse seus inboxes para gerenciar as conversas</CardDescription>
+            <CardDescription>Acesse o chat para gerenciar as conversas</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => navigate("/inboxes")}>
-              Ver Inboxes
+            <Button onClick={() => navigate("/chat")}>
+              Ir para Chat
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </CardContent>

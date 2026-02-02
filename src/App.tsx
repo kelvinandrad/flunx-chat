@@ -16,9 +16,6 @@ import CreateOrganization from "./pages/auth/CreateOrganization";
 // Chat
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import InboxList from "./pages/chat/InboxList";
-import ConversationList from "./pages/chat/ConversationList";
-import ConversationView from "./pages/chat/ConversationView";
 import ChatPage from "./pages/chat/ChatPage";
 import ChannelsList from "./pages/communication/channels/ChannelsList";
 import SettingsChat from "./pages/settings/SettingsChat";
@@ -78,10 +75,7 @@ const AppRoutes = () => (
 
     <Route path="/" element={<ProtectedRoute><RequireOrganization><Index /></RequireOrganization></ProtectedRoute>} />
     <Route path="/chat" element={<ProtectedRoute><RequireOrganization><ChatPage /></RequireOrganization></ProtectedRoute>} />
-    <Route path="/inboxes" element={<ProtectedRoute><RequireOrganization><InboxList /></RequireOrganization></ProtectedRoute>} />
     <Route path="/canais" element={<ProtectedRoute><RequireOrganization><ChannelsList /></RequireOrganization></ProtectedRoute>} />
-    <Route path="/inboxes/:inboxId/conversations" element={<ProtectedRoute><RequireOrganization><ConversationList /></RequireOrganization></ProtectedRoute>} />
-    <Route path="/inboxes/:inboxId/conversations/:conversationId" element={<ProtectedRoute><RequireOrganization><ConversationView /></RequireOrganization></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><RequireOrganization><SettingsChat /></RequireOrganization></ProtectedRoute>} />
 
     <Route path="*" element={<NotFound />} />

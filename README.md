@@ -21,8 +21,8 @@ Docker Swarm ou `docker-compose.dev.yml` para hot reload em desenvolvimento.
 
 ## Estrutura
 
-- `/inboxes` – Lista de inboxes (canais)
-- `/inboxes/:id/conversations` – Conversas do inbox
-- `/inboxes/:id/conversations/:id` – Visualização da conversa
+- `/` – Visão geral
+- `/canais` – Gerenciar canais WhatsApp (criar, conectar, reconectar)
+- `/chat` – Chat unificado (canais, conversas, mensagens). Aceita `?channel=<id>` para pré-selecionar canal
 
 Ver `docs/MODELAGEM.md` para o modelo de dados.
