@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, MessageSquare, Settings } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Settings, Radio } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SidebarProps {
@@ -16,6 +16,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Visão Geral", href: "/" },
+  { icon: Radio, label: "Canais", href: "/canais" },
   { icon: MessageSquare, label: "Inboxes", href: "/inboxes" },
   { icon: Settings, label: "Configurações", href: "/configuracoes" },
 ];
@@ -35,7 +36,7 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-40 flex flex-col",
+        "fixed left-0 top-0 bottom-0 min-h-screen h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-40 flex flex-col",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
@@ -56,8 +57,8 @@ export default function Sidebar({ isCollapsed }: SidebarProps) {
         </div>
       </div>
 
-      {/* Navigation - mesmo padrão de tema do flunx-v2 */}
-      <nav className="flex-1 overflow-y-auto scrollbar-thin py-2 px-2">
+      {/* Navigation - preenche até o fim da página */}
+      <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin py-2 px-2">
         <div>
           {!isCollapsed && (
             <div className="px-3 py-2">

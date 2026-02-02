@@ -88,6 +88,53 @@ export type Database = {
           },
         ]
       }
+      chat_inboxes: {
+        Row: {
+          id: string
+          organization_id: string
+          name: string
+          channel_type: string
+          evolution_instance_name: string
+          evolution_base_url: string | null
+          connection_status: string
+          qr_code: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          name: string
+          channel_type?: string
+          evolution_instance_name: string
+          evolution_base_url?: string | null
+          connection_status?: string
+          qr_code?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          name?: string
+          channel_type?: string
+          evolution_instance_name?: string
+          evolution_base_url?: string | null
+          connection_status?: string
+          qr_code?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_inboxes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       installment_rules: {
         Row: {
           created_at: string
