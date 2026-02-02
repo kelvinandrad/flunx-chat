@@ -195,19 +195,23 @@ export function ContactCommercialTab({
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="p-3">
+        <Card className="p-3 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 text-green-600 mb-1">
-            <CheckCircle2 className="h-4 w-4" />
-            <span className="text-xs font-medium">Fechados</span>
+            <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+            <span className="text-xs font-medium truncate">Fechados</span>
           </div>
-          <p className="text-lg font-bold">{formatCurrency(acceptedValue)}</p>
+          <p className="text-lg font-bold whitespace-nowrap overflow-x-auto scrollbar-thin" title={formatCurrency(acceptedValue)}>
+            {formatCurrency(acceptedValue)}
+          </p>
         </Card>
-        <Card className="p-3">
+        <Card className="p-3 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 text-blue-600 mb-1">
-            <TrendingUp className="h-4 w-4" />
-            <span className="text-xs font-medium">Em aberto</span>
+            <TrendingUp className="h-4 w-4 flex-shrink-0" />
+            <span className="text-xs font-medium truncate">Em aberto</span>
           </div>
-          <p className="text-lg font-bold">{formatCurrency(pendingValue)}</p>
+          <p className="text-lg font-bold whitespace-nowrap overflow-x-auto scrollbar-thin" title={formatCurrency(pendingValue)}>
+            {formatCurrency(pendingValue)}
+          </p>
         </Card>
       </div>
 
@@ -370,21 +374,22 @@ export function ContactCommercialTab({
               {proposals.map((proposal) => {
                 const StatusIcon = STATUS_CONFIG[proposal.status].icon;
                 return (
-                  <Card key={proposal.id} className="p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium text-sm truncate">
+                  <Card key={proposal.id} className="p-3 min-w-0 overflow-hidden">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
+                          <p className="font-medium text-sm break-words min-w-0">
                             {proposal.title}
                           </p>
                           <Badge
                             variant="secondary"
                             className={cn(
-                              "text-xs text-white",
+                              "text-xs text-white whitespace-nowrap flex-shrink-0",
                               STATUS_CONFIG[proposal.status].color
                             )}
+                            title={STATUS_CONFIG[proposal.status].label}
                           >
-                            <StatusIcon className="h-3 w-3 mr-1" />
+                            <StatusIcon className="h-3 w-3 mr-1 flex-shrink-0" />
                             {STATUS_CONFIG[proposal.status].label}
                           </Badge>
                         </div>
@@ -392,11 +397,11 @@ export function ContactCommercialTab({
                           {formatDate(proposal.createdAt)} •{" "}
                           {proposal.items.length} item(s)
                         </p>
-                        <p className="text-sm font-semibold text-primary mt-1">
+                        <p className="text-sm font-semibold text-primary mt-1 whitespace-nowrap overflow-x-auto scrollbar-thin" title={formatCurrency(proposal.totalValue)}>
                           {formatCurrency(proposal.totalValue)}
                         </p>
                       </div>
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1 flex-shrink-0">
                         {proposal.status === "draft" && (
                           <Button
                             size="sm"

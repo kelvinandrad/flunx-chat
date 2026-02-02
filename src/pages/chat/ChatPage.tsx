@@ -242,6 +242,7 @@ export default function ChatPage() {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>("all");
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
+  const [isConversationsColumnOpen, setIsConversationsColumnOpen] = useState(true);
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
   const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
   const [notes, setNotes] = useState(MOCK_NOTES);
@@ -297,22 +298,23 @@ export default function ChatPage() {
 
   return (
     <AppLayout>
-      <div className="h-[calc(100vh-7rem)] flex bg-background overflow-hidden rounded-lg border border-border">
-        {/* Conversation list with channel selector */}
-        <ConversationListPanel
-          conversations={conversations}
-          selectedConversationId={selectedConversationId}
-          onSelectConversation={(id) => {
-            setSelectedConversationId(id);
-            // Mark as read
-            setConversations((prev) =>
-              prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
-            );
-          }}
-          channels={MOCK_CHANNELS}
-          selectedChannelId={selectedChannelId}
-          onSelectChannel={setSelectedChannelId}
-        />
+      <div className="h-full flex-1 flex bg-background overflow-hidden min-h-0">
+        {/* Conversation list with channel selector (colapsável) */}
+        {isConversationsColumnOpen && (
+          <ConversationListPanel
+            conversations={conversations}
+            selectedConversationId={selectedConversationId}
+            onSelectConversation={(id) => {
+              setSelectedConversationId(id);
+              setConversations((prev) =>
+                prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
+              );
+            }}
+            channels={MOCK_CHANNELS}
+            selectedChannelId={selectedChannelId}
+            onSelectChannel={setSelectedChannelId}
+          />
+        )}
 
         {/* Chat area */}
         <ChatArea
@@ -321,6 +323,8 @@ export default function ChatPage() {
           onSendMessage={handleSendMessage}
           onToggleContactPanel={() => setIsContactPanelOpen(!isContactPanelOpen)}
           isContactPanelOpen={isContactPanelOpen}
+          isConversationsColumnOpen={isConversationsColumnOpen}
+          onToggleConversationsColumn={() => setIsConversationsColumnOpen((v) => !v)}
         />
 
         {/* Contact panel */}

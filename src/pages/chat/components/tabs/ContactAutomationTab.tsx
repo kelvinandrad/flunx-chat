@@ -422,10 +422,10 @@ export function ContactAutomationTab({
           <ScrollArea className="max-h-[200px]">
             <div className="space-y-2">
               {pendingMessages.map((msg) => (
-                <Card key={msg.id} className="p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">{msg.content}</p>
+                <Card key={msg.id} className="p-3 min-w-0 overflow-hidden">
+                  <div className="flex items-start gap-2">
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <p className="text-sm break-words whitespace-pre-wrap">{msg.content}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {formatDateTime(msg.scheduledAt)}
                       </p>
@@ -433,7 +433,7 @@ export function ContactAutomationTab({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-destructive"
+                      className="h-7 w-7 text-destructive flex-shrink-0"
                       onClick={() => onCancelMessage?.(msg.id)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -467,20 +467,20 @@ export function ContactAutomationTab({
                 return (
                   <Card
                     key={reminder.id}
-                    className={cn("p-3", isOverdue && "border-destructive/50")}
+                    className={cn("p-3 min-w-0 overflow-hidden", isOverdue && "border-destructive/50")}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="flex items-start gap-2">
+                          <p className="text-sm font-medium break-words min-w-0">
                             {reminder.title}
                           </p>
                           {isOverdue && (
-                            <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
+                            <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
                           )}
                         </div>
                         {reminder.description && (
-                          <p className="text-xs text-muted-foreground truncate">
+                          <p className="text-xs text-muted-foreground break-words mt-0.5">
                             {reminder.description}
                           </p>
                         )}
@@ -498,7 +498,7 @@ export function ContactAutomationTab({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-green-600"
+                        className="h-7 w-7 text-green-600 flex-shrink-0"
                         onClick={() => onCompleteReminder?.(reminder.id)}
                       >
                         <CheckCircle2 className="h-4 w-4" />

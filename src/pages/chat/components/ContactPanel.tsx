@@ -118,7 +118,7 @@ export function ContactPanel({
     reminders.filter((r) => r.status === "active").length;
 
   return (
-    <div className="h-full w-72 border-l border-border bg-card flex flex-col">
+    <div className="h-full w-[400px] min-w-[360px] border-l border-border bg-card flex flex-col overflow-hidden">
       {/* Header */}
       <div className="h-12 px-4 flex items-center justify-between border-b border-border flex-shrink-0">
         <h3 className="font-semibold text-sm">Dados do contato</h3>
@@ -128,12 +128,12 @@ export function ContactPanel({
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid grid-cols-4 mx-4 mt-3 h-10">
-          <TabsTrigger value="info" className="relative">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <TabsList className="grid grid-cols-4 mx-4 mt-3 h-10 flex-shrink-0 min-w-0">
+          <TabsTrigger value="info" className="relative flex-shrink-0">
             <User className="h-4 w-4" />
           </TabsTrigger>
-          <TabsTrigger value="notes" className="relative">
+          <TabsTrigger value="notes" className="relative flex-shrink-0">
             <StickyNote className="h-4 w-4" />
             {notesCount > 0 && (
               <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center text-[10px] bg-primary text-primary-foreground rounded-full px-1">
@@ -141,7 +141,7 @@ export function ContactPanel({
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="commercial" className="relative">
+          <TabsTrigger value="commercial" className="relative flex-shrink-0">
             <Briefcase className="h-4 w-4" />
             {pendingProposals > 0 && (
               <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center text-[10px] bg-orange-500 text-white rounded-full px-1">
@@ -149,7 +149,7 @@ export function ContactPanel({
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="automation" className="relative">
+          <TabsTrigger value="automation" className="relative flex-shrink-0">
             <Zap className="h-4 w-4" />
             {pendingAutomations > 0 && (
               <span className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center text-[10px] bg-blue-500 text-white rounded-full px-1">
@@ -160,12 +160,12 @@ export function ContactPanel({
         </TabsList>
 
         {/* Tab content */}
-        <ScrollArea className="flex-1 mt-3">
-          <TabsContent value="info" className="px-4 pb-4 m-0">
+        <ScrollArea className="flex-1 mt-3 min-h-0">
+          <TabsContent value="info" className="px-4 pb-4 m-0 min-w-0">
             <ContactInfoTab contact={contact} onUpdate={onUpdateContact} />
           </TabsContent>
 
-          <TabsContent value="notes" className="px-4 pb-4 m-0 h-full">
+          <TabsContent value="notes" className="px-4 pb-4 m-0 h-full min-w-0 overflow-hidden">
             <ContactNotesTab
               notes={notes}
               onAddNote={onAddNote}
@@ -175,7 +175,7 @@ export function ContactPanel({
             />
           </TabsContent>
 
-          <TabsContent value="commercial" className="px-4 pb-4 m-0">
+          <TabsContent value="commercial" className="px-4 pb-4 m-0 min-w-0 overflow-hidden">
             <ContactCommercialTab
               proposals={proposals}
               products={[]}
@@ -185,7 +185,7 @@ export function ContactPanel({
             />
           </TabsContent>
 
-          <TabsContent value="automation" className="px-4 pb-4 m-0">
+          <TabsContent value="automation" className="px-4 pb-4 m-0 min-w-0 overflow-hidden">
             <ContactAutomationTab
               scheduledMessages={scheduledMessages}
               reminders={reminders}

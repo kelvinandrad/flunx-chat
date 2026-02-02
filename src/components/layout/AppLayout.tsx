@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Topbar } from "./Topbar";
 import Sidebar from "./Sidebar";
 import { cn } from "@/lib/utils";
@@ -31,8 +32,11 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children }: AppLayoutProps) {
+  const location = useLocation();
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  const isChatPage = location.pathname.startsWith("/chat");
 
   useEffect(() => {
     const root = document.documentElement;
@@ -68,7 +72,12 @@ export function AppLayout({ children }: AppLayoutProps) {
           onThemeChange={handleThemeChange}
           onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
-        <main className="flex-1 p-4 lg:p-6">
+        <main
+          className={cn(
+            "flex-1 flex flex-col min-h-0",
+            isChatPage ? "p-0 overflow-hidden" : "p-4 lg:p-6"
+          )}
+        >
           {children}
         </main>
       </div>

@@ -24,6 +24,8 @@ import {
   Ban,
   Trash2,
   MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { MessageBubble, DateSeparator, Message } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
@@ -45,6 +47,8 @@ interface ChatAreaProps {
   onSendMessage: (content: string) => void;
   onToggleContactPanel: () => void;
   isContactPanelOpen: boolean;
+  isConversationsColumnOpen?: boolean;
+  onToggleConversationsColumn?: () => void;
   isLoading?: boolean;
 }
 
@@ -54,6 +58,8 @@ export function ChatArea({
   onSendMessage,
   onToggleContactPanel,
   isContactPanelOpen,
+  isConversationsColumnOpen = true,
+  onToggleConversationsColumn,
   isLoading,
 }: ChatAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -96,17 +102,46 @@ export function ChatArea({
     return "";
   };
 
+  // Toggle button for conversations column (used in header and empty state)
+  const ToggleConversationsButton = () =>
+    onToggleConversationsColumn ? (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 flex-shrink-0"
+            onClick={onToggleConversationsColumn}
+          >
+            {isConversationsColumnOpen ? (
+              <PanelLeftClose className="h-4 w-4" />
+            ) : (
+              <PanelLeftOpen className="h-4 w-4" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {isConversationsColumnOpen ? "Ocultar conversas" : "Mostrar conversas"}
+        </TooltipContent>
+      </Tooltip>
+    ) : null;
+
   // Empty state
   if (!contact) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-muted/30 text-muted-foreground">
-        <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center mb-4">
-          <MessageSquare className="h-12 w-12 opacity-50" />
+      <div className="flex-1 flex flex-col min-w-0 bg-background">
+        <div className="h-14 px-4 flex items-center gap-3 border-b border-border bg-card flex-shrink-0">
+          {ToggleConversationsButton()}
         </div>
-        <h3 className="text-lg font-medium mb-1">Selecione uma conversa</h3>
-        <p className="text-sm">
-          Escolha uma conversa na lista para começar a interagir
-        </p>
+        <div className="flex-1 flex flex-col items-center justify-center bg-muted/30 text-muted-foreground">
+          <div className="h-24 w-24 rounded-full bg-muted flex items-center justify-center mb-4">
+            <MessageSquare className="h-12 w-12 opacity-50" />
+          </div>
+          <h3 className="text-lg font-medium mb-1">Selecione uma conversa</h3>
+          <p className="text-sm">
+            Escolha uma conversa na lista para começar a interagir
+          </p>
+        </div>
       </div>
     );
   }
@@ -115,6 +150,9 @@ export function ChatArea({
     <div className="flex-1 flex flex-col min-w-0 bg-background">
       {/* Header */}
       <div className="h-14 px-4 flex items-center gap-3 border-b border-border bg-card flex-shrink-0">
+        {/* Toggle conversations column */}
+        {ToggleConversationsButton()}
+
         {/* Contact info */}
         <button
           onClick={onToggleContactPanel}
