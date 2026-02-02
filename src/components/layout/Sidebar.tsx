@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, MessageSquare, Settings, Radio } from "lucide-react";
+import { LayoutDashboard, Settings, Radio, MessageCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SidebarProps {
@@ -16,8 +16,8 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Visão Geral", href: "/" },
+  { icon: MessageCircle, label: "Chat", href: "/chat" },
   { icon: Radio, label: "Canais", href: "/canais" },
-  { icon: MessageSquare, label: "Inboxes", href: "/inboxes" },
   { icon: Settings, label: "Configurações", href: "/configuracoes" },
 ];
 

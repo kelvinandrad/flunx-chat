@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  MessageCircle,
   Plus,
   Settings,
   CheckCircle2,
@@ -14,17 +13,28 @@ import {
   Loader2,
   Zap,
   ArrowRight,
+  QrCode,
+  Trash2,
+  RefreshCw,
+  Users,
+  MessageSquare,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useChannels } from "@/hooks/useChannels";
 import { CreateChannelDialog } from "./CreateChannelDialog";
+import { RefreshQRDialog } from "./RefreshQRDialog";
+import { DeleteChannelDialog } from "./DeleteChannelDialog";
+import { ReconnectDialog } from "./ReconnectDialog";
+import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const CHANNEL_ICONS: Record<string, typeof MessageCircle> = {
-  whatsapp_non_official: MessageCircle,
+const CHANNEL_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  whatsapp: WhatsAppIcon,
+  whatsapp_non_official: WhatsAppIcon,
 };
 
 function getChannelIcon(channelType: string) {
-  return CHANNEL_ICONS[channelType] ?? MessageCircle;
+  return CHANNEL_ICONS[channelType] ?? WhatsAppIcon;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -83,6 +93,54 @@ export default function ChannelsList() {
   const navigate = useNavigate();
   const { channels, isLoading, invalidate } = useChannels();
   const [createOpen, setCreateOpen] = useState(false);
+  const [refreshQROpen, setRefreshQROpen] = useState(false);
+  const [refreshQRInboxId, setRefreshQRInboxId] = useState<string | null>(null);
+  const [refreshQRChannelName, setRefreshQRChannelName] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteInboxId, setDeleteInboxId] = useState<string | null>(null);
+  const [deleteChannelName, setDeleteChannelName] = useState("");
+  const [reconnectOpen, setReconnectOpen] = useState(false);
+  const [reconnectInboxId, setReconnectInboxId] = useState<string | null>(null);
+  const [reconnectChannelName, setReconnectChannelName] = useState("");
+  const [reconnectIsConnected, setReconnectIsConnected] = useState(false);
+
+  const openRefreshQR = (inboxId: string, channelName: string) => {
+    setRefreshQRInboxId(inboxId);
+    setRefreshQRChannelName(channelName);
+    setRefreshQROpen(true);
+  };
+
+  const closeRefreshQR = () => {
+    setRefreshQROpen(false);
+    setRefreshQRInboxId(null);
+    setRefreshQRChannelName("");
+  };
+
+  const openDelete = (inboxId: string, channelName: string) => {
+    setDeleteInboxId(inboxId);
+    setDeleteChannelName(channelName);
+    setDeleteOpen(true);
+  };
+
+  const closeDelete = () => {
+    setDeleteOpen(false);
+    setDeleteInboxId(null);
+    setDeleteChannelName("");
+  };
+
+  const openReconnect = (inboxId: string, channelName: string, isConnected: boolean) => {
+    setReconnectInboxId(inboxId);
+    setReconnectChannelName(channelName);
+    setReconnectIsConnected(isConnected);
+    setReconnectOpen(true);
+  };
+
+  const closeReconnect = () => {
+    setReconnectOpen(false);
+    setReconnectInboxId(null);
+    setReconnectChannelName("");
+    setReconnectIsConnected(false);
+  };
 
   const connectedCount = channels.filter((c) => c.connection_status === "connected").length;
 
@@ -153,8 +211,8 @@ export default function ChannelsList() {
         ) : channels.length === 0 ? (
           <Card className="overflow-hidden rounded-2xl border border-dashed border-border bg-muted/20">
             <CardContent className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10">
-                <MessageCircle className="h-10 w-10 text-primary" />
+              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-500/10">
+                <WhatsAppIcon className="h-10 w-10 text-emerald-500" />
               </div>
               <h2 className="mt-4 text-lg font-semibold text-foreground">
                 Nenhum canal conectado
@@ -176,6 +234,8 @@ export default function ChannelsList() {
             {channels.map((channel) => {
               const Icon = getChannelIcon(channel.channel_type);
               const detailPath = getChannelDetailPath(channel.id);
+              const isConnected = channel.connection_status === "connected";
+              const hasProfile = isConnected && channel.whatsapp_profile_name;
               return (
                 <Card
                   key={channel.id}
@@ -184,11 +244,26 @@ export default function ChannelsList() {
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex gap-4">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                          <Icon className="h-7 w-7" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-foreground">{channel.name}</h3>
+                        {/* Avatar: foto do WhatsApp se conectado, ícone se não */}
+                        {hasProfile && channel.whatsapp_profile_pic_url ? (
+                          <Avatar className="h-14 w-14 rounded-2xl">
+                            <AvatarImage src={channel.whatsapp_profile_pic_url} alt={channel.whatsapp_profile_name || ""} />
+                            <AvatarFallback className="rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              <Icon className="h-7 w-7" />
+                            </AvatarFallback>
+                          </Avatar>
+                        ) : (
+                          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            <Icon className="h-7 w-7" />
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold text-foreground truncate">
+                            {channel.name}
+                          </h3>
+                          {hasProfile && channel.whatsapp_phone_number && (
+                            <p className="text-xs text-muted-foreground">{channel.whatsapp_phone_number}</p>
+                          )}
                           <div className="mt-1.5">{StatusBadge({ status: channel.connection_status })}</div>
                         </div>
                       </div>
@@ -205,38 +280,102 @@ export default function ChannelsList() {
                       </Button>
                     </div>
 
-                    <div className="mt-6 grid grid-cols-2 gap-3">
-                      <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Tipo
-                        </p>
-                        <p className="mt-0.5 text-sm font-medium text-foreground">
-                          WhatsApp
-                        </p>
+                    {/* Stats: Contatos e Conversas (se conectado) */}
+                    {isConnected ? (
+                      <div className="mt-6 grid grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            <Users className="h-3 w-3 inline mr-1" />
+                            Contatos
+                          </p>
+                          <p className="mt-0.5 text-sm font-medium text-foreground">
+                            {channel.contacts_count?.toLocaleString() || 0}
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            <MessageSquare className="h-3 w-3 inline mr-1" />
+                            Conversas
+                          </p>
+                          <p className="mt-0.5 text-sm font-medium text-foreground">
+                            {channel.conversations_count?.toLocaleString() || 0}
+                          </p>
+                        </div>
                       </div>
-                      <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
-                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                          Criado em
-                        </p>
-                        <p className="mt-0.5 text-sm font-medium text-foreground">
-                          {formatDate(channel.created_at)}
-                        </p>
+                    ) : (
+                      <div className="mt-6 grid grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            Tipo
+                          </p>
+                          <p className="mt-0.5 text-sm font-medium text-foreground">
+                            WhatsApp
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-muted/50 px-3 py-2.5 text-center">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            Criado em
+                          </p>
+                          <p className="mt-0.5 text-sm font-medium text-foreground">
+                            {formatDate(channel.created_at)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-4">
-                      <span className="text-xs text-muted-foreground truncate max-w-[180px]">
-                        {channel.evolution_instance_name}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-1.5 rounded-lg text-primary hover:bg-primary/10"
-                        onClick={() => navigate(detailPath)}
-                      >
-                        Configurar
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </Button>
+                    <div className="mt-4 flex flex-col gap-2 border-t border-border/60 pt-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                          {channel.evolution_instance_name}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-1.5 rounded-lg text-primary hover:bg-primary/10"
+                          onClick={() => navigate(detailPath)}
+                        >
+                          Configurar
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        {/* Botão Conectar (para não conectados) */}
+                        {!isConnected && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 rounded-lg flex-1 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                            onClick={() => openRefreshQR(channel.id, channel.name)}
+                          >
+                            <QrCode className="h-3.5 w-3.5" />
+                            Conectar
+                          </Button>
+                        )}
+                        {/* Botão Reconectar (sempre visível para WhatsApp) */}
+                        {channel.channel_type === "whatsapp" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 rounded-lg border-primary/30 text-primary hover:bg-primary/10"
+                            onClick={() => openReconnect(channel.id, channel.name, isConnected)}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Reconectar
+                          </Button>
+                        )}
+                        {/* Botão Excluir */}
+                        {channel.channel_type === "whatsapp" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 rounded-lg border-destructive/30 text-destructive hover:bg-destructive/10"
+                            onClick={() => openDelete(channel.id, channel.name)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Excluir
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -250,6 +389,34 @@ export default function ChannelsList() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSuccess={invalidate}
+      />
+      <RefreshQRDialog
+        open={refreshQROpen}
+        onOpenChange={(open) => !open && closeRefreshQR()}
+        inboxId={refreshQRInboxId}
+        channelName={refreshQRChannelName}
+        onSuccess={invalidate}
+      />
+      <DeleteChannelDialog
+        open={deleteOpen}
+        onOpenChange={(open) => !open && closeDelete()}
+        channelId={deleteInboxId}
+        channelName={deleteChannelName}
+        onSuccess={() => {
+          invalidate();
+          closeDelete();
+        }}
+      />
+      <ReconnectDialog
+        open={reconnectOpen}
+        onOpenChange={(open) => !open && closeReconnect()}
+        channelId={reconnectInboxId}
+        channelName={reconnectChannelName}
+        isConnected={reconnectIsConnected}
+        onSuccess={() => {
+          invalidate();
+          closeReconnect();
+        }}
       />
     </AppLayout>
   );
