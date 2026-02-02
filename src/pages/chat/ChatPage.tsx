@@ -1,259 +1,112 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useCallback, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ConversationListPanel, Channel } from "./components/ConversationListPanel";
 import { Conversation } from "./components/ConversationItem";
 import { ChatArea } from "./components/ChatArea";
 import { Message } from "./components/MessageBubble";
 import { ContactPanel } from "./components/ContactPanel";
-import { cn } from "@/lib/utils";
+import { useChannels } from "@/hooks/useChannels";
+import { useConversations } from "@/hooks/useConversations";
+import { useMessages, useSendMessage } from "@/hooks/useMessages";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
+import { listMessages } from "@/lib/chat-api";
+import type { ConversationListItem, MessageListItem } from "@/lib/chat-api-types";
+import {
+  useContactNotes,
+  useContactProposals,
+  useScheduledMessages,
+  useReminders,
+} from "@/hooks/useContactPanel";
 
-// Mock data - será substituído por dados reais do Supabase
-const MOCK_CHANNELS: Channel[] = [
-  {
-    id: "ch1",
-    name: "Kelvin Andrade",
-    type: "whatsapp",
-    phoneNumber: "(62) 99928-8205",
-    avatar: "",
-    unreadCount: 5,
-    status: "connected",
-  },
-  {
-    id: "ch2",
-    name: "Suporte Comercial",
-    type: "whatsapp",
-    phoneNumber: "(11) 98765-4321",
-    unreadCount: 2,
-    status: "connected",
-  },
-  {
-    id: "ch3",
-    name: "Vendas",
-    type: "whatsapp",
-    phoneNumber: "(21) 91234-5678",
+function mapInboxToChannel(inbox: {
+  id: string;
+  name: string;
+  channel_type: string;
+  connection_status: string;
+  whatsapp_phone_number?: string | null;
+}): Channel {
+  const status =
+    inbox.connection_status === "connected"
+      ? "connected"
+      : inbox.connection_status === "pending"
+        ? "connecting"
+        : "disconnected";
+  return {
+    id: inbox.id,
+    name: inbox.name,
+    type: (inbox.channel_type as Channel["type"]) || "whatsapp",
+    phoneNumber: inbox.whatsapp_phone_number ?? undefined,
     unreadCount: 0,
-    status: "disconnected",
-  },
-];
+    status,
+  };
+}
 
-const MOCK_CONVERSATIONS: Conversation[] = [
-  {
-    id: "conv1",
+function mapConversationListItemToConversation(item: ConversationListItem): Conversation {
+  const contactName = item.contact?.name ?? item.contact?.remote_jid ?? "Contato";
+  return {
+    id: item.id,
     contact: {
-      id: "c1",
-      name: "Pequena❤️",
-      phone: "+55 62 99999-0001",
+      id: item.contact?.id ?? "",
+      name: contactName,
+      phone: item.contact?.remote_jid ?? undefined,
     },
     lastMessage: {
-      content: "Pra saber o tamanho da cortina kk",
-      timestamp: new Date().toISOString(),
-      isFromContact: true,
-    },
-    unreadCount: 2,
-    status: "open",
-    isOnline: true,
-    labels: ["Lead quente"],
-  },
-  {
-    id: "conv2",
-    contact: {
-      id: "c2",
-      name: "Edilberto Andrade",
-      phone: "+55 62 99999-0002",
-    },
-    lastMessage: {
-      content: "sem contexto fica difícil verificar, vou a...",
-      timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      content: item.preview ?? "",
+      timestamp: item.preview_at ?? item.updated_at,
       isFromContact: true,
     },
     unreadCount: 0,
-    status: "open",
-    isTyping: true,
-  },
-  {
-    id: "conv3",
-    contact: {
-      id: "c3",
-      name: "SUPORTE | Luuvi Aprovec.",
-      phone: "+55 11 98765-4321",
-    },
-    lastMessage: {
-      content: "Mensagem apagada",
-      timestamp: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-      isFromContact: false,
-    },
-    unreadCount: 0,
-    status: "open",
-    labels: ["Cliente", "VIP"],
-  },
-  {
-    id: "conv4",
-    contact: {
-      id: "c4",
-      name: "LimpaCrm - REINICIA EN...",
-      avatar: "",
-      phone: "+55 21 91234-5678",
-    },
-    lastMessage: {
-      content: "~ Dayane Villas: Já está incluso o v...",
-      timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-      isFromContact: true,
-    },
-    unreadCount: 8,
-    status: "pending",
-    labels: ["Follow-up"],
-  },
-  {
-    id: "conv5",
-    contact: {
-      id: "c5",
-      name: "LimpaCrm + Avantti",
-      phone: "+55 31 99876-5432",
-    },
-    lastMessage: {
-      content: "~ Pedrocunha: 📄 Contrato Modelo ...",
-      timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-      isFromContact: true,
-    },
-    unreadCount: 7,
-    status: "open",
-  },
-  {
-    id: "conv6",
-    contact: {
-      id: "c6",
-      name: "LimpaCrm - ReCred+",
-      phone: "+55 41 98765-1234",
-    },
-    lastMessage: {
-      content: "~ Recred+: 🎤 0:26",
-      timestamp: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
-      isFromContact: true,
-    },
-    unreadCount: 5,
-    status: "open",
-  },
-];
+    status: (item.status as Conversation["status"]) ?? "open",
+  };
+}
 
-const MOCK_MESSAGES: Message[] = [
-  {
-    id: "m1",
-    content: "Olá! Tudo bem?",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    isFromContact: true,
-    status: "read",
-  },
-  {
-    id: "m2",
-    content: "Oi! Tudo sim, e você?",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 23).toISOString(),
-    isFromContact: false,
-    status: "read",
-  },
-  {
-    id: "m3",
-    content: "Estou bem! Gostaria de saber mais sobre o produto X",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 22).toISOString(),
-    isFromContact: true,
-    status: "read",
-  },
-  {
-    id: "m4",
-    content: "Claro! O produto X é perfeito para você. Ele oferece:\n\n• Funcionalidade 1\n• Funcionalidade 2\n• Funcionalidade 3\n\nPosso te enviar mais detalhes?",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 21).toISOString(),
-    isFromContact: false,
-    status: "read",
-  },
-  {
-    id: "m5",
-    content: "Sim, por favor! Qual o valor?",
-    timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    isFromContact: true,
-    status: "read",
-  },
-  {
-    id: "m6",
-    content: "O investimento é de R$ 199,90/mês. Temos também uma condição especial para contratação anual com 20% de desconto! 🎉",
-    timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    isFromContact: false,
-    status: "delivered",
-  },
-  {
-    id: "m7",
-    content: "Interessante! Vou conversar com meu sócio e te retorno",
-    timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    isFromContact: true,
-    status: "read",
-  },
-];
-
-const MOCK_NOTES = [
-  {
-    id: "n1",
-    content: "Cliente interessado no plano empresarial. Aguardando retorno do sócio para fechar.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    author: { id: "1", name: "Você" },
-    isPinned: true,
-  },
-  {
-    id: "n2",
-    content: "Enviar proposta formal por email",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    author: { id: "1", name: "Você" },
-  },
-];
-
-const MOCK_PROPOSALS = [
-  {
-    id: "p1",
-    title: "Proposta Plano Empresarial",
-    status: "sent" as const,
-    totalValue: 499.90,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-    items: [
-      { productId: "3", productName: "Plano Empresarial", quantity: 1, unitPrice: 499.90 },
-    ],
-  },
-];
-
-const MOCK_SCHEDULED_MESSAGES = [
-  {
-    id: "sm1",
-    content: "Olá! Gostaria de saber se teve a oportunidade de analisar nossa proposta.",
-    scheduledAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
-    status: "pending" as const,
-    type: "follow-up" as const,
-  },
-];
-
-const MOCK_REMINDERS = [
-  {
-    id: "r1",
-    title: "Ligar para confirmar reunião",
-    description: "Reunião agendada para sexta às 14h",
-    dueAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2).toISOString(),
-    status: "active" as const,
-  },
-];
+function mapMessageListItemToMessage(msg: MessageListItem): Message {
+  return {
+    id: msg.id,
+    content: msg.content,
+    timestamp: msg.created_at,
+    isFromContact: msg.direction === "incoming",
+    status: msg.status === "failed" ? "failed" : msg.status === "sent" ? "sent" : "delivered",
+  };
+}
 
 export default function ChatPage() {
-  const navigate = useNavigate();
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>("all");
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
   const [isConversationsColumnOpen, setIsConversationsColumnOpen] = useState(true);
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
-  const [conversations, setConversations] = useState<Conversation[]>(MOCK_CONVERSATIONS);
-  const [notes, setNotes] = useState(MOCK_NOTES);
-  const [proposals, setProposals] = useState(MOCK_PROPOSALS);
-  const [scheduledMessages, setScheduledMessages] = useState(MOCK_SCHEDULED_MESSAGES);
-  const [reminders, setReminders] = useState(MOCK_REMINDERS);
+  const [olderMessages, setOlderMessages] = useState<MessageListItem[]>([]);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
-  // Get selected conversation
+  const { session } = useAuth();
+  const { organizationId } = useTenant();
+  const { channels: inboxes } = useChannels();
+  const channels: Channel[] = inboxes.map(mapInboxToChannel);
+
+  const inboxIdForConversations =
+    selectedChannelId && selectedChannelId !== "all" ? selectedChannelId : null;
+  const { conversations: conversationsRaw, isLoading: conversationsLoading } =
+    useConversations(inboxIdForConversations);
+  const conversations: Conversation[] = conversationsRaw.map(mapConversationListItemToConversation);
+
+  const { messages: messagesRaw, isLoading: messagesLoading, cursor, hasMore } = useMessages(
+    selectedConversationId ?? null
+  );
+
+  const allMessagesRaw = [...olderMessages, ...messagesRaw];
+  const messages: Message[] = allMessagesRaw.map(mapMessageListItemToMessage).reverse();
+
+  const { send } = useSendMessage(selectedConversationId ?? null);
+
+  // Reset older messages when conversation changes
+  useEffect(() => {
+    setOlderMessages([]);
+    setSendError(null);
+  }, [selectedConversationId]);
+
   const selectedConversation = conversations.find((c) => c.id === selectedConversationId);
-  
-  // Get contact from selected conversation
   const selectedContact = selectedConversation
     ? {
         ...selectedConversation.contact,
@@ -264,59 +117,239 @@ export default function ChatPage() {
       }
     : null;
 
-  // Handle send message
-  const handleSendMessage = (content: string) => {
-    const newMessage: Message = {
-      id: `m${Date.now()}`,
-      content,
-      timestamp: new Date().toISOString(),
-      isFromContact: false,
-      status: "sending",
-    };
-    setMessages((prev) => [...prev, newMessage]);
+  const contactId = selectedContact?.id ?? null;
+  const {
+    notes: notesRaw,
+    addNote,
+    editNote,
+    deleteNote,
+    togglePinNote,
+  } = useContactNotes(contactId);
+  const {
+    proposals: proposalsRaw,
+    createProposal,
+    sendProposal,
+    closeProposal,
+  } = useContactProposals(contactId);
+  const {
+    scheduledMessages: scheduledMessagesRaw,
+    scheduleMessage,
+    cancelMessage,
+  } = useScheduledMessages(contactId);
+  const { reminders: remindersRaw, createReminder, completeReminder } = useReminders(contactId);
 
-    // Simulate message sent
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === newMessage.id ? { ...m, status: "delivered" } : m
-        )
-      );
-    }, 1000);
-  };
+  const notes = notesRaw.map((n: any) => ({
+    id: n.id,
+    content: n.content,
+    createdAt: n.created_at,
+    updatedAt: n.updated_at,
+    author: { id: n.author?.id ?? "", name: n.author?.full_name ?? "Usuário" },
+    isPinned: n.is_pinned ?? false,
+  }));
 
-  // Handle add note
-  const handleAddNote = (content: string) => {
-    const newNote = {
-      id: `n${Date.now()}`,
-      content,
-      createdAt: new Date().toISOString(),
-      author: { id: "1", name: "Você" },
-    };
-    setNotes((prev) => [newNote, ...prev]);
-  };
+  const proposals = proposalsRaw.map((p: any) => ({
+    id: p.id,
+    title: p.title,
+    status: p.status as any,
+    totalValue: parseFloat(p.total_value ?? 0),
+    createdAt: p.created_at,
+    items: Array.isArray(p.items) ? p.items : [],
+  }));
+
+  const scheduledMessages = scheduledMessagesRaw.map((m: any) => ({
+    id: m.id,
+    content: m.content,
+    scheduledAt: m.scheduled_at,
+    status: m.status as any,
+    type: m.type as any,
+  }));
+
+  const reminders = remindersRaw.map((r: any) => ({
+    id: r.id,
+    title: r.title,
+    description: r.description ?? "",
+    dueAt: r.due_at,
+    status: r.status as any,
+  }));
+
+  const handleSendMessage = useCallback(
+    async (content: string) => {
+      if (!selectedConversationId) return;
+      setSendError(null);
+      try {
+        await send({ content });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setSendError(msg);
+      }
+    },
+    [selectedConversationId, send]
+  );
+
+  const handleLoadOlder = useCallback(async () => {
+    if (!selectedConversationId || !session?.access_token || !cursor || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const result = await listMessages(selectedConversationId, session.access_token, { before: cursor });
+      setOlderMessages((prev) => [...prev, ...result.messages]);
+    } catch (e) {
+      console.error("Erro ao carregar mensagens antigas:", e);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [selectedConversationId, session, cursor, loadingOlder]);
+
+  const handleRetry = useCallback(() => {
+    setSendError(null);
+  }, []);
+
+  const handleAddNote = useCallback(
+    async (content: string) => {
+      if (!contactId || !organizationId) return;
+      try {
+        await addNote.mutateAsync({ contactId, organizationId, content });
+      } catch (e) {
+        console.error("Erro ao adicionar nota:", e);
+      }
+    },
+    [contactId, organizationId, addNote]
+  );
+
+  const handleEditNote = useCallback(
+    async (noteId: string, content: string) => {
+      try {
+        await editNote.mutateAsync({ noteId, content });
+      } catch (e) {
+        console.error("Erro ao editar nota:", e);
+      }
+    },
+    [editNote]
+  );
+
+  const handleDeleteNote = useCallback(
+    async (noteId: string) => {
+      try {
+        await deleteNote.mutateAsync(noteId);
+      } catch (e) {
+        console.error("Erro ao deletar nota:", e);
+      }
+    },
+    [deleteNote]
+  );
+
+  const handleTogglePinNote = useCallback(
+    async (noteId: string) => {
+      const note = notesRaw.find((n: any) => n.id === noteId);
+      if (!note) return;
+      try {
+        await togglePinNote.mutateAsync({ noteId, isPinned: note.is_pinned ?? false });
+      } catch (e) {
+        console.error("Erro ao fixar/desafixar nota:", e);
+      }
+    },
+    [notesRaw, togglePinNote]
+  );
+
+  const handleCreateProposal = useCallback(
+    async (proposal: any) => {
+      if (!contactId || !organizationId) return;
+      try {
+        await createProposal.mutateAsync({ contactId, organizationId, proposal });
+      } catch (e) {
+        console.error("Erro ao criar proposta:", e);
+      }
+    },
+    [contactId, organizationId, createProposal]
+  );
+
+  const handleSendProposal = useCallback(
+    async (proposalId: string) => {
+      try {
+        await sendProposal.mutateAsync(proposalId);
+      } catch (e) {
+        console.error("Erro ao enviar proposta:", e);
+      }
+    },
+    [sendProposal]
+  );
+
+  const handleCloseProposal = useCallback(
+    async (proposalId: string, status: "accepted" | "rejected") => {
+      try {
+        await closeProposal.mutateAsync({ proposalId, status });
+      } catch (e) {
+        console.error("Erro ao fechar proposta:", e);
+      }
+    },
+    [closeProposal]
+  );
+
+  const handleScheduleMessage = useCallback(
+    async (msg: any) => {
+      if (!contactId || !organizationId) return;
+      try {
+        await scheduleMessage.mutateAsync({
+          contactId,
+          organizationId,
+          conversationId: selectedConversationId,
+          message: msg,
+        });
+      } catch (e) {
+        console.error("Erro ao agendar mensagem:", e);
+      }
+    },
+    [contactId, organizationId, selectedConversationId, scheduleMessage]
+  );
+
+  const handleCancelMessage = useCallback(
+    async (messageId: string) => {
+      try {
+        await cancelMessage.mutateAsync(messageId);
+      } catch (e) {
+        console.error("Erro ao cancelar mensagem:", e);
+      }
+    },
+    [cancelMessage]
+  );
+
+  const handleCreateReminder = useCallback(
+    async (reminder: any) => {
+      if (!contactId || !organizationId) return;
+      try {
+        await createReminder.mutateAsync({ contactId, organizationId, reminder });
+      } catch (e) {
+        console.error("Erro ao criar lembrete:", e);
+      }
+    },
+    [contactId, organizationId, createReminder]
+  );
+
+  const handleCompleteReminder = useCallback(
+    async (reminderId: string) => {
+      try {
+        await completeReminder.mutateAsync(reminderId);
+      } catch (e) {
+        console.error("Erro ao completar lembrete:", e);
+      }
+    },
+    [completeReminder]
+  );
 
   return (
     <AppLayout>
       <div className="h-full flex-1 flex bg-background overflow-hidden min-h-0">
-        {/* Conversation list with channel selector (colapsável) */}
         {isConversationsColumnOpen && (
           <ConversationListPanel
             conversations={conversations}
             selectedConversationId={selectedConversationId}
-            onSelectConversation={(id) => {
-              setSelectedConversationId(id);
-              setConversations((prev) =>
-                prev.map((c) => (c.id === id ? { ...c, unreadCount: 0 } : c))
-              );
-            }}
-            channels={MOCK_CHANNELS}
+            onSelectConversation={setSelectedConversationId}
+            channels={channels}
             selectedChannelId={selectedChannelId}
             onSelectChannel={setSelectedChannelId}
+            isLoading={conversationsLoading}
           />
         )}
 
-        {/* Chat area */}
         <ChatArea
           contact={selectedContact}
           messages={selectedConversationId ? messages : []}
@@ -325,9 +358,14 @@ export default function ChatPage() {
           isContactPanelOpen={isContactPanelOpen}
           isConversationsColumnOpen={isConversationsColumnOpen}
           onToggleConversationsColumn={() => setIsConversationsColumnOpen((v) => !v)}
+          isLoading={messagesLoading}
+          hasMoreMessages={hasMore}
+          onLoadMore={handleLoadOlder}
+          isLoadingMore={loadingOlder}
+          sendError={sendError}
+          onRetrySend={handleRetry}
         />
 
-        {/* Contact panel */}
         {isContactPanelOpen && selectedContact && (
           <ContactPanel
             contact={selectedContact}
@@ -337,75 +375,16 @@ export default function ChatPage() {
             reminders={reminders}
             onClose={() => setIsContactPanelOpen(false)}
             onAddNote={handleAddNote}
-            onEditNote={(id, content) => {
-              setNotes((prev) =>
-                prev.map((n) =>
-                  n.id === id
-                    ? { ...n, content, updatedAt: new Date().toISOString() }
-                    : n
-                )
-              );
-            }}
-            onDeleteNote={(id) => {
-              setNotes((prev) => prev.filter((n) => n.id !== id));
-            }}
-            onTogglePinNote={(id) => {
-              setNotes((prev) =>
-                prev.map((n) => (n.id === id ? { ...n, isPinned: !n.isPinned } : n))
-              );
-            }}
-            onCreateProposal={(proposal) => {
-              const newProposal = {
-                ...proposal,
-                id: `p${Date.now()}`,
-                createdAt: new Date().toISOString(),
-              };
-              setProposals((prev) => [newProposal, ...prev]);
-            }}
-            onSendProposal={(id) => {
-              setProposals((prev) =>
-                prev.map((p) =>
-                  p.id === id
-                    ? { ...p, status: "sent" as const, sentAt: new Date().toISOString() }
-                    : p
-                )
-              );
-            }}
-            onCloseProposal={(id, status) => {
-              setProposals((prev) =>
-                prev.map((p) => (p.id === id ? { ...p, status } : p))
-              );
-            }}
-            onScheduleMessage={(msg) => {
-              const newMsg = {
-                ...msg,
-                id: `sm${Date.now()}`,
-                status: "pending" as const,
-              };
-              setScheduledMessages((prev) => [...prev, newMsg]);
-            }}
-            onCancelMessage={(id) => {
-              setScheduledMessages((prev) =>
-                prev.map((m) =>
-                  m.id === id ? { ...m, status: "cancelled" as const } : m
-                )
-              );
-            }}
-            onCreateReminder={(reminder) => {
-              const newReminder = {
-                ...reminder,
-                id: `r${Date.now()}`,
-                status: "active" as const,
-              };
-              setReminders((prev) => [...prev, newReminder]);
-            }}
-            onCompleteReminder={(id) => {
-              setReminders((prev) =>
-                prev.map((r) =>
-                  r.id === id ? { ...r, status: "completed" as const } : r
-                )
-              );
-            }}
+            onEditNote={handleEditNote}
+            onDeleteNote={handleDeleteNote}
+            onTogglePinNote={handleTogglePinNote}
+            onCreateProposal={handleCreateProposal}
+            onSendProposal={handleSendProposal}
+            onCloseProposal={handleCloseProposal}
+            onScheduleMessage={handleScheduleMessage}
+            onCancelMessage={handleCancelMessage}
+            onCreateReminder={handleCreateReminder}
+            onCompleteReminder={handleCompleteReminder}
           />
         )}
       </div>

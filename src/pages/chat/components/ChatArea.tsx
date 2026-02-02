@@ -26,6 +26,8 @@ import {
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
+  Loader2,
+  RotateCcw,
 } from "lucide-react";
 import { MessageBubble, DateSeparator, Message } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
@@ -50,6 +52,11 @@ interface ChatAreaProps {
   isConversationsColumnOpen?: boolean;
   onToggleConversationsColumn?: () => void;
   isLoading?: boolean;
+  hasMoreMessages?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  sendError?: string | null;
+  onRetrySend?: () => void;
 }
 
 export function ChatArea({
@@ -61,6 +68,11 @@ export function ChatArea({
   isConversationsColumnOpen = true,
   onToggleConversationsColumn,
   isLoading,
+  hasMoreMessages,
+  onLoadMore,
+  isLoadingMore,
+  sendError,
+  onRetrySend,
 }: ChatAreaProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -276,23 +288,55 @@ export function ChatArea({
             <p className="text-sm">Envie a primeira mensagem para iniciar</p>
           </div>
         ) : (
-          Object.entries(groupedMessages).map(([date, dayMessages]) => (
-            <div key={date}>
-              <DateSeparator date={date} />
-              {dayMessages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  contactName={contact.name}
-                />
-              ))}
-            </div>
-          ))
+          <>
+            {hasMoreMessages && onLoadMore && (
+              <div className="flex justify-center pb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onLoadMore}
+                  disabled={isLoadingMore}
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                      Carregando...
+                    </>
+                  ) : (
+                    "Carregar mensagens antigas"
+                  )}
+                </Button>
+              </div>
+            )}
+            {Object.entries(groupedMessages).map(([date, dayMessages]) => (
+              <div key={date}>
+                <DateSeparator date={date} />
+                {dayMessages.map((message) => (
+                  <MessageBubble
+                    key={message.id}
+                    message={message}
+                    contactName={contact.name}
+                  />
+                ))}
+              </div>
+            ))}
+          </>
         )}
       </div>
 
       {/* Input */}
-      <ChatInput onSendMessage={onSendMessage} />
+      <div>
+        {sendError && onRetrySend && (
+          <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20 flex items-center gap-2">
+            <p className="text-xs text-destructive flex-1">{sendError}</p>
+            <Button variant="ghost" size="sm" onClick={onRetrySend} className="h-6 text-xs">
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Tentar novamente
+            </Button>
+          </div>
+        )}
+        <ChatInput onSendMessage={onSendMessage} />
+      </div>
     </div>
   );
 }

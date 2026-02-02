@@ -466,21 +466,50 @@ A implementação se divide em **5 fases**:
 
 **Entregáveis:** APIs de listagem (conversas, mensagens) e de envio de mensagem; mensagens enviadas aparecendo no WhatsApp e gravadas em `chat_messages`.
 
+#### Contratos da Fase 2 (flunx-channels-api)
+
+Todas as rotas abaixo exigem **Authorization: Bearer &lt;JWT Supabase&gt;** (401 se ausente). RLS aplica-se às tabelas `chat_inboxes`, `chat_conversations`, `chat_contacts`, `chat_messages`.
+
+**GET /inboxes/:inboxId/conversations**
+
+- Params: `inboxId` (UUID).
+- Response 200: `{ conversations: Array<{ id, contact: { id, name, remote_jid }, preview, preview_at, status, updated_at }> }`.
+- Erros: 400 (inboxId inválido), 401 (sem token), 500.
+
+**GET /conversations/:conversationId/messages**
+
+- Params: `conversationId` (UUID). Query: `limit` (1–100, default 50), `before` (cursor ISO `created_at` para carregar mensagens mais antigas).
+- Response 200: `{ messages: Array<{ id, content, direction, message_type, status, created_at, evolution_message_id }>, cursor, has_more }`.
+- Ordem: `created_at` **descendente** (mensagens mais recentes primeiro). Sem cursor: retorna as 50 mais recentes. Com `?before=<timestamp>`: retorna as 50 anteriores a esse timestamp (mais antigas). Frontend deve reverter o array para exibir mais antigas no topo. Use `cursor` como `?before=...` para carregar mais antigas (botão no topo da lista).
+
+**POST /conversations/:conversationId/messages**
+
+- Params: `conversationId` (UUID). Body: `{ content: string }` (texto da mensagem).
+- Response 201: objeto da mensagem criada com `status: "sent"` e `evolution_message_id` quando Evolution retornar sucesso.
+- Erros: 400 (content vazio ou conversa/inbox sem dados para envio), 401, 404 (conversa não encontrada), 502 (falha na Evolution; mensagem fica com `status: "failed"`).
+
 ---
 
 ### Fase 3 — Frontend flunx-chat com dados reais
 
 **Objetivo:** Substituir mocks por dados do Supabase e pela API de envio.
 
+**Contexto do front atual (análise):**
+- **Duas UIs de chat:** (1) **ChatPage (`/chat`)** — uma única página com dropdown de canais, lista de conversas, área de mensagens e painel do contato (notas, propostas, agendamentos, lembretes); hoje 100% mock (`MOCK_CHANNELS`, `MOCK_CONVERSATIONS`, `MOCK_MESSAGES`); envio simulado. (2) **Fluxo por rotas** — InboxList (`/inboxes`) → ConversationList (`/inboxes/:inboxId/conversations`) → ConversationView (`/inboxes/:inboxId/conversations/:conversationId`); as três telas usam mocks; ConversationView tem input mas não envia de verdade.
+- **Canais:** `useChannels()` já lê `chat_inboxes` via Supabase (e Realtime); usado em ChannelsList (`/canais`). A flunx-channels-api é chamada em CreateChannelDialog, ReconnectDialog, etc. com `VITE_CHANNELS_API_URL`; para **conversas e mensagens** a API exige **Authorization: Bearer &lt;JWT Supabase&gt;** — o front deve usar `session.access_token` (ex.: `supabase.auth.getSession()` ou contexto de auth) em todas as chamadas a `GET /inboxes/:inboxId/conversations`, `GET /conversations/:id/messages` e `POST /conversations/:id/messages`.
+- **Tipos:** Contratos da Fase 2 e tipos em `src/lib/chat-api-types.ts`; mapear `ConversationListItem` → `Conversation` (ConversationItem/ChatPage), `MessageListItem` → `Message` (MessageBubble), `ChatInbox` → `Channel` (ConversationListPanel).
+
 | # | Item | Detalhamento |
 |---|------|----------------|
-| 3.1 | **InboxList** | Remover `MOCK_INBOXES`. Listar inboxes a partir de `chat_inboxes` (já existe `useChannels()` que lê `chat_inboxes`). Reutilizar mesma fonte que ChannelsList ou endpoint `GET /channels?organization_id=...`. Manter navegação para `/inboxes/:inboxId/conversations`. |
-| 3.2 | **ConversationList** | Remover mock. Buscar conversas do inbox via API (ex.: `GET /inboxes/:inboxId/conversations`) ou diretamente Supabase (`chat_conversations` com `inbox_id = inboxId` + RLS). Exibir nome do contato, preview da última mensagem, status, unread (se houver), data. Clique → `/inboxes/:inboxId/conversations/:conversationId`. |
-| 3.3 | **ConversationView** | Remover mock. Buscar mensagens via API (ex.: `GET /conversations/:conversationId/messages`) ou Supabase (`chat_messages` onde `conversation_id = conversationId`). Exibir lista de mensagens (incoming/outgoing), conteúdo, horário. Input de envio: ao enviar, chamar `POST /conversations/:conversationId/messages` com conteúdo; atualizar UI (otimista ou após resposta). Opcional: Supabase Realtime em `chat_messages` para atualizar em tempo real. |
-| 3.4 | **Nome do inbox na ConversationList** | Buscar nome do inbox por `inboxId` (de `chat_inboxes` ou do endpoint de conversas) para exibir no header. |
+| 3.1 | **InboxList** | Remover `MOCK_INBOXES`. Listar inboxes com `useChannels()` (mesma fonte que ChannelsList) ou `GET /channels?organization_id=...`. Manter navegação para `/inboxes/:inboxId/conversations`. |
+| 3.2 | **ConversationList** | Remover mock. Buscar conversas via API `GET /inboxes/:inboxId/conversations` com header `Authorization: Bearer <session.access_token>` (base URL: `VITE_CHANNELS_API_URL`). Exibir nome do contato (`contact.name`), preview (`preview`), status, data (`updated_at`/`preview_at`). Unread: não há coluna no retorno atual; exibir 0 ou omitir. Clique → `/inboxes/:inboxId/conversations/:conversationId`. |
+| 3.3 | **ConversationView** | Remover mock. Buscar mensagens via API `GET /conversations/:conversationId/messages` (com Bearer). Exibir lista (incoming/outgoing via `direction`), conteúdo, horário (`created_at`). Input: ao enviar, chamar `POST /conversations/:conversationId/messages` com `{ content }` (Bearer); atualizar UI (otimista ou após resposta). Opcional: Supabase Realtime em `chat_messages` para novas mensagens. |
+| 3.4 | **Nome do inbox** | Em ConversationList (e ChatPage quando houver inbox selecionado), buscar nome do inbox por `inboxId`: de `useChannels().channels` (find por id) ou de `chat_inboxes`; exibir no header. |
 | 3.5 | **Tratamento de erros e loading** | Estados de loading, erro de rede e mensagem não enviada (retry ou feedback). |
+| 3.6 | **ChatPage (/chat)** | Conectar à mesma fonte: canais = `useChannels().channels` mapeados para `Channel` (id, name, type, status, phoneNumber de `whatsapp_phone_number`, unreadCount 0 ou a calcular depois). Ao selecionar um canal (inbox), buscar conversas com `GET /inboxes/:inboxId/conversations` (Bearer). Ao selecionar conversa, buscar mensagens com `GET /conversations/:conversationId/messages` e enviar com `POST /conversations/:conversationId/messages`. Mapear respostas para os tipos atuais (`Conversation`, `Message`). Painel do contato (notas, propostas, agendamentos, lembretes) pode permanecer mock na Fase 3; integrar em fase posterior. |
+| 3.7 | **Autenticação e config** | Todas as chamadas à flunx-channels-api que usem rotas de conversas/mensagens devem enviar `Authorization: Bearer <Supabase JWT>` (ex.: `(await supabase.auth.getSession()).data.session?.access_token`). Base URL: `VITE_CHANNELS_API_URL` (já usada em canais). Reutilizar tipos de `src/lib/chat-api-types.ts`. |
 
-**Entregáveis:** InboxList, ConversationList e ConversationView usando dados reais e envio funcionando ponta a ponta (Flunx-Chat → API → Evolution → WhatsApp).
+**Entregáveis:** InboxList, ConversationList e ConversationView usando dados reais e envio funcionando ponta a ponta; ChatPage (/chat) opcionalmente conectada na mesma Fase 3 ou em sequência. Fluxo: Flunx-Chat → API (Bearer) → Evolution → WhatsApp.
 
 ---
 
@@ -502,16 +531,20 @@ A implementação se divide em **5 fases**:
 
 | Etapa (Chatwoot+Evolution) | Nosso sistema | Fase |
 |---------------------------|---------------|------|
-| Criar instância Evolution | ✅ flunx-channels-api | 0 (precisa correções) |
-| Conectar WhatsApp (QR)   | ✅ API + front (CreateChannelDialog) | 0 (precisa correções) |
-| Polling de status após QR | ❌ | 0 (implementar) |
-| Reexibir QR expirado | ❌ | 0 (implementar) |
-| Persistir canal           | ✅ chat_inboxes | 0 (precisa rollback) |
-| Dizer à Evolution para onde enviar eventos | ✅ (Fase 1 implementada) | 1 (webhook) |
-| Receber mensagem no backend | ✅ (Fase 1 implementada) | 1 (endpoint + handler) |
-| Modelo contact/conversation/message | ✅ Tabelas existem; schema alinhado | 1 (concluída) |
-| Listar conversas/mensagens | ❌ | 2 (API) + 3 (front) |
-| Enviar mensagem (atendente) | ❌ | 2 (API) + 3 (front) |
+| Criar instância Evolution | ✅ flunx-channels-api | 0 ✅ |
+| Conectar WhatsApp (QR)   | ✅ API + front (CreateChannelDialog) | 0 ✅ |
+| Polling de status após QR | ✅ CreateChannelDialog + RefreshQRDialog | 0 ✅ |
+| Reexibir QR expirado | ✅ RefreshQRDialog | 0 ✅ |
+| Persistir canal / rollback | ✅ chat_inboxes + rollback em falhas | 0 ✅ |
+| Dizer à Evolution para onde enviar eventos | ✅ (Fase 1 implementada) | 1 ✅ |
+| Receber mensagem no backend | ✅ (Fase 1 implementada) | 1 ✅ |
+| Modelo contact/conversation/message | ✅ Tabelas + schema alinhado (incl. chat_messages status/sender_type) | 1 ✅ |
+| Listar conversas/mensagens | ✅ GET /inboxes/:id/conversations, GET /conversations/:id/messages + front (InboxList, ConversationList, ConversationView, ChatPage) | 2 + 3 ✅ |
+| Enviar mensagem (atendente) | ✅ POST /conversations/:id/messages + front com Bearer | 2 + 3 ✅ |
+| Realtime no chat | ✅ Supabase Realtime em chat_messages e chat_conversations (useMessages, useConversations) | 3 ✅ |
+| Carregar mais mensagens (paginação) | ⚠️ API suporta (next_cursor); front sem botão "Carregar mais" | 3 (melhoria) |
+| Retry ao falhar envio | ⚠️ Erro exibido; sem botão "Tentar novamente" | 3 (melhoria) |
+| Painel do contato (notas, propostas, agendamentos) | ❌ Mock; integrar em fase posterior | — |
 | Não perder mensagem (filas) | ❌ | 4 (opcional) |
 
 ---

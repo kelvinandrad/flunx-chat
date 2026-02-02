@@ -3,28 +3,49 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageCircle, ArrowLeft } from "lucide-react";
+import { MessageCircle, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useParams } from "react-router-dom";
-
-// Mock data
-const MOCK_CONVERSATIONS = [
-  { id: "c1", contact: "João Silva", preview: "Obrigado pelo atendimento!", status: "open", unread: 2, time: "10:32" },
-  { id: "c2", contact: "Maria Santos", preview: "Preciso de ajuda com o pedido", status: "open", unread: 0, time: "09:15" },
-  { id: "c3", contact: "Pedro Oliveira", preview: "Qual o prazo de entrega?", status: "resolved", unread: 0, time: "Ontem" },
-  { id: "c4", contact: "Ana Costa", preview: "Bom dia! Gostaria de mais informações", status: "pending", unread: 1, time: "Ontem" },
-];
+import { useConversations } from "@/hooks/useConversations";
+import { useChannels } from "@/hooks/useChannels";
 
 const statusLabels: Record<string, string> = {
   open: "Aberto",
   pending: "Pendente",
   resolved: "Resolvido",
+  snoozed: "Adiado",
 };
+
+function formatTime(iso: string): string {
+  const date = new Date(iso);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) {
+    return date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  }
+  if (days === 1) return "Ontem";
+  if (days < 7) return `${days} dias`;
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
+function getInitials(name: string | null): string {
+  if (!name || !name.trim()) return "?";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
 
 const ConversationList = () => {
   const navigate = useNavigate();
   const { inboxId } = useParams();
-  const inboxName = "WhatsApp Principal"; // Mock
+  const { channels } = useChannels();
+  const { conversations, isLoading, error } = useConversations(inboxId);
+
+  const inboxName = inboxId ? channels.find((c) => c.id === inboxId)?.name ?? "Inbox" : "Inbox";
 
   return (
     <AppLayout>
@@ -35,9 +56,17 @@ const ConversationList = () => {
           </Button>
           <div>
             <h1 className="text-xl font-semibold text-foreground">{inboxName}</h1>
-            <p className="text-sm text-muted-foreground">Conversas • {MOCK_CONVERSATIONS.length} ativas</p>
+            <p className="text-sm text-muted-foreground">
+              Conversas • {isLoading ? "..." : conversations.length}
+            </p>
           </div>
         </div>
+
+        {error && (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive mb-4">
+            {error.message}
+          </div>
+        )}
 
         <Card className="flex-1 min-h-0">
           <CardHeader className="border-b">
@@ -47,36 +76,57 @@ const ConversationList = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ScrollArea className="h-[calc(100vh-280px)]">
-              {MOCK_CONVERSATIONS.map((conv) => (
-                <div
-                  key={conv.id}
-                  className="flex items-center gap-4 p-4 border-b hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => navigate(`/inboxes/${inboxId}/conversations/${conv.id}`)}
-                >
-                  <Avatar>
-                    <AvatarFallback>{conv.contact.slice(0, 2)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium truncate">{conv.contact}</span>
-                      <span className="text-xs text-muted-foreground">{conv.time}</span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-sm text-muted-foreground truncate flex-1">{conv.preview}</p>
-                      {conv.unread > 0 && (
-                        <Badge variant="default" className="text-xs h-5">{conv.unread}</Badge>
-                      )}
-                    </div>
-                    <Badge variant="outline" className="mt-1 text-xs">{statusLabels[conv.status]}</Badge>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <ScrollArea className="h-[calc(100vh-280px)]">
+                {conversations.length === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">
+                    Nenhuma conversa neste inbox.
                   </div>
-                </div>
-              ))}
-            </ScrollArea>
+                ) : (
+                  conversations.map((conv) => {
+                    const contactName = conv.contact?.name ?? conv.contact?.remote_jid ?? "Contato";
+                    const time = conv.preview_at ?? conv.updated_at;
+                    return (
+                      <div
+                        key={conv.id}
+                        className="flex items-center gap-4 p-4 border-b hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() =>
+                          navigate(`/inboxes/${inboxId}/conversations/${conv.id}`)
+                        }
+                      >
+                        <Avatar>
+                          <AvatarFallback>{getInitials(contactName)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium truncate">{contactName}</span>
+                            {time && (
+                              <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
+                                {formatTime(time)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-sm text-muted-foreground truncate flex-1">
+                              {conv.preview ?? "—"}
+                            </p>
+                          </div>
+                          <Badge variant="outline" className="mt-1 text-xs">
+                            {statusLabels[conv.status] ?? conv.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </ScrollArea>
+            )}
           </CardContent>
         </Card>
-
-        <p className="text-xs text-muted-foreground mt-2">* Mock: dados de demonstração</p>
       </div>
     </AppLayout>
   );
