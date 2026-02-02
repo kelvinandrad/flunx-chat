@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, MessageSquare, Settings, ChevronDown, ChevronRight } from "lucide-react";
+import { LayoutDashboard, MessageSquare, Settings } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SidebarProps {
@@ -20,78 +20,102 @@ const menuItems: MenuItem[] = [
   { icon: Settings, label: "Configurações", href: "/configuracoes" },
 ];
 
-const Sidebar = ({ isCollapsed }: SidebarProps) => {
-  const [expanded, setExpanded] = useState<string | null>("chat");
+export default function Sidebar({ isCollapsed }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+
+  const handleNavigate = (href: string) => {
+    navigate(href);
+  };
+
+  const isActiveRoute = (href: string) => {
+    return location.pathname === href || (href !== "/" && location.pathname.startsWith(href));
+  };
 
   return (
     <aside
       className={cn(
-        "flex flex-col border-r border-border bg-card transition-all duration-300",
-        isCollapsed ? "w-[52px]" : "w-56"
+        "fixed left-0 top-0 h-screen bg-sidebar border-r border-sidebar-border transition-all duration-300 z-40 flex flex-col",
+        isCollapsed ? "w-16" : "w-64"
       )}
     >
-      <div className="flex h-14 items-center border-b border-border px-3">
-        {!isCollapsed && (
-          <span className="font-semibold text-foreground">Flunx Chat</span>
+      {/* Logo Section - igual flunx-v2 */}
+      <div
+        className={cn(
+          "h-16 flex items-center border-b border-sidebar-border px-3 flex-shrink-0",
+          isCollapsed ? "justify-center" : "justify-start"
         )}
+      >
+        <div className="flex items-center gap-2">
+          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
+            <span className="text-primary-foreground font-bold text-base">N</span>
+          </div>
+          {!isCollapsed && (
+            <span className="font-semibold text-sidebar-foreground text-lg">Flunx Chat</span>
+          )}
+        </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-2">
-        {!isCollapsed && (
-          <div className="mb-2 px-2 py-1">
-            <button
-              onClick={() => setExpanded(expanded === "chat" ? null : "chat")}
-              className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <span>Chat</span>
-              {expanded === "chat" ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </button>
-          </div>
-        )}
-
-        {(isCollapsed || expanded === "chat") && (
-          <div className="space-y-0.5">
+      {/* Navigation - mesmo padrão de tema do flunx-v2 */}
+      <nav className="flex-1 overflow-y-auto scrollbar-thin py-2 px-2">
+        <div>
+          {!isCollapsed && (
+            <div className="px-3 py-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+                Chat
+              </span>
+            </div>
+          )}
+          <ul className="space-y-0.5">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.href || 
-                (item.href !== "/" && location.pathname.startsWith(item.href));
+              const isActive = isActiveRoute(item.href);
 
-              const link = (
-                <button
-                  key={item.href}
-                  onClick={() => navigate(item.href)}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {!isCollapsed && <span>{item.label}</span>}
-                </button>
-              );
+              if (isCollapsed) {
+                return (
+                  <li key={item.href}>
+                    <Tooltip delayDuration={0}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => handleNavigate(item.href)}
+                          className={cn(
+                            "w-full flex items-center justify-center h-10 rounded-md transition-colors",
+                            isActive
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                          )}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="bg-popover">
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  </li>
+                );
+              }
 
-              return isCollapsed ? (
-                <Tooltip key={item.href} delayDuration={0}>
-                  <TooltipTrigger asChild>{link}</TooltipTrigger>
-                  <TooltipContent side="right">{item.label}</TooltipContent>
-                </Tooltip>
-              ) : (
-                link
+              return (
+                <li key={item.href}>
+                  <button
+                    onClick={() => handleNavigate(item.href)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
+                      isActive
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                    )}
+                  >
+                    <Icon className="h-4 w-4 flex-shrink-0" />
+                    <span className="flex-1 text-left truncate">{item.label}</span>
+                  </button>
+                </li>
               );
             })}
-          </div>
-        )}
+          </ul>
+        </div>
       </nav>
     </aside>
   );
-};
-
-export default Sidebar;
+}

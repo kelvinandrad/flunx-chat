@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Topbar } from "./Topbar";
-import { Sidebar } from "./Sidebar";
+import Sidebar from "./Sidebar";
 import { cn } from "@/lib/utils";
 
 const THEME_KEY = "flunx-theme";
