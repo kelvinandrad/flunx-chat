@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CHANNELS_API_URL = import.meta.env.VITE_CHANNELS_API_URL || "http://localhost:3001";
 
@@ -26,9 +27,12 @@ export type ChatInbox = {
 };
 
 // Busca dados atualizados do canal via API (força sync com Evolution)
-async function refreshChannelInfo(channelId: string): Promise<void> {
+async function refreshChannelInfo(channelId: string, accessToken: string | undefined): Promise<void> {
+  if (!accessToken) return;
   try {
-    await fetch(`${CHANNELS_API_URL}/channels/${channelId}/info`);
+    await fetch(`${CHANNELS_API_URL}/channels/${channelId}/info`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
   } catch (err) {
     console.warn("[useChannels] Failed to refresh channel info:", err);
   }
@@ -71,13 +75,13 @@ export function useChannels() {
       ) {
         refreshingRef.current.add(channel.id);
         console.log("[useChannels] Refreshing channel info:", channel.id);
-        refreshChannelInfo(channel.id).finally(() => {
+        refreshChannelInfo(channel.id, session?.access_token).finally(() => {
           // Remove do set após 5s para permitir retry se necessário
           setTimeout(() => refreshingRef.current.delete(channel.id), 5000);
         });
       }
     });
-  }, [query.data]);
+  }, [query.data, session?.access_token]);
 
   // Supabase Realtime: escuta mudanças na tabela chat_inboxes
   useEffect(() => {
@@ -105,7 +109,7 @@ export function useChannels() {
           ) {
             // Aguarda 2s para Evolution sincronizar os contatos
             setTimeout(async () => {
-              await refreshChannelInfo(newData.id);
+              await refreshChannelInfo(newData.id, session?.access_token);
               invalidate();
             }, 2000);
           }
@@ -119,7 +123,7 @@ export function useChannels() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [organizationId, queryClient]);
+  }, [organizationId, queryClient, session?.access_token]);
 
   return { ...query, channels: query.data ?? [], invalidate };
 }

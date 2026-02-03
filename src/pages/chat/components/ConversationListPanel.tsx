@@ -17,7 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Search, Filter, X, ChevronDown, Check, Loader2 } from "lucide-react";
+import { Search, Filter, X, ChevronDown, Check, Loader2, Tag } from "lucide-react";
 import { ConversationItem, Conversation } from "./ConversationItem";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,8 @@ export interface Channel {
   phoneNumber?: string;
 }
 
+export type ListViewMode = "all" | "archived" | "pinned";
+
 interface ConversationListPanelProps {
   conversations: Conversation[];
   selectedConversationId: string | null;
@@ -43,6 +45,9 @@ interface ConversationListPanelProps {
   hasMoreConversations?: boolean;
   onLoadMoreConversations?: () => void;
   isLoadingMoreConversations?: boolean;
+  listView?: ListViewMode;
+  onListViewChange?: (view: ListViewMode) => void;
+  onUpdateConversationLabels?: (conversationId: string, labels: string[]) => Promise<void>;
 }
 
 type FilterTab = "all" | "unread" | "open" | "pending" | "resolved";
@@ -74,11 +79,17 @@ export function ConversationListPanel({
   hasMoreConversations,
   onLoadMoreConversations,
   isLoadingMoreConversations,
+  listView = "all",
+  onListViewChange,
+  onUpdateConversationLabels,
 }: ConversationListPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
+  const [labelsPopoverOpen, setLabelsPopoverOpen] = useState(false);
+  const [labelsEditDraft, setLabelsEditDraft] = useState<string[]>([]);
+  const [labelsEditSaving, setLabelsEditSaving] = useState(false);
   // Draft state when popover is open (user can change and then Apply or Cancel)
   const [draftStatus, setDraftStatus] = useState<FilterTab>(activeTab);
   const [draftLabels, setDraftLabels] = useState<string[]>(selectedLabels);
@@ -90,6 +101,35 @@ export function ConversationListPanel({
       setDraftLabels(selectedLabels.slice());
     }
   }, [filterPopoverOpen, activeTab, selectedLabels]);
+
+  const selectedConversation = selectedConversationId
+    ? conversations.find((c) => c.id === selectedConversationId)
+    : null;
+
+  // Sync labels-edit draft when opening popover or when selected conversation changes (not on every conversations refetch)
+  useEffect(() => {
+    if (!labelsPopoverOpen || !selectedConversationId) return;
+    const conv = conversations.find((c) => c.id === selectedConversationId);
+    setLabelsEditDraft(conv?.labels ?? []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only sync on open/conv change, not when conversations array reference changes
+  }, [labelsPopoverOpen, selectedConversationId]);
+
+  const toggleLabelsEditDraft = (labelId: string) => {
+    setLabelsEditDraft((prev) =>
+      prev.includes(labelId) ? prev.filter((id) => id !== labelId) : [...prev, labelId]
+    );
+  };
+
+  const applyLabelsEdit = async () => {
+    if (!selectedConversationId || !onUpdateConversationLabels) return;
+    setLabelsEditSaving(true);
+    try {
+      await onUpdateConversationLabels(selectedConversationId, labelsEditDraft);
+      setLabelsPopoverOpen(false);
+    } finally {
+      setLabelsEditSaving(false);
+    }
+  };
 
   // Get selected channel info
   const selectedChannel = channels.find((c) => c.id === selectedChannelId);
@@ -262,6 +302,93 @@ export function ConversationListPanel({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* List view: Todas | Arquivadas | Fixadas (Fase C) */}
+        {onListViewChange && (
+          <div className="flex rounded-lg border border-border/60 bg-muted/30 p-0.5">
+            {(["all", "archived", "pinned"] as const).map((view) => (
+              <button
+                key={view}
+                type="button"
+                onClick={() => onListViewChange(view)}
+                className={cn(
+                  "flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  listView === view
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {view === "all" ? "Todas" : view === "archived" ? "Arquivadas" : "Fixadas"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Editar etiquetas da conversa selecionada */}
+        {selectedConversationId && onUpdateConversationLabels && (
+          <Popover open={labelsPopoverOpen} onOpenChange={setLabelsPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1.5 text-xs"
+                title="Editar etiquetas da conversa"
+              >
+                <Tag className="h-3.5 w-3.5" />
+                Etiquetas
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-64 p-0" sideOffset={4}>
+              <div className="p-3 border-b border-border">
+                <h4 className="font-semibold text-sm">Etiquetas da conversa</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Selecione as etiquetas e clique em Aplicar.
+                </p>
+              </div>
+              <div className="p-3 space-y-1 max-h-48 overflow-y-auto">
+                {LABELS.map((label) => (
+                  <button
+                    key={label.id}
+                    type="button"
+                    onClick={() => toggleLabelsEditDraft(label.id)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                      labelsEditDraft.includes(label.id)
+                        ? "bg-primary/10 text-primary"
+                        : "hover:bg-muted"
+                    )}
+                  >
+                    <span className={cn("h-2 w-2 rounded-full flex-shrink-0", label.color)} />
+                    <span className="flex-1 text-left">{label.name}</span>
+                    {labelsEditDraft.includes(label.id) && (
+                      <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div className="p-3 flex justify-end gap-2 border-t border-border">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLabelsPopoverOpen(false)}
+                  disabled={labelsEditSaving}
+                >
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={applyLabelsEdit} disabled={labelsEditSaving}>
+                  {labelsEditSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Aplicar"
+                  )}
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
 
         {/* Search + Filter row */}
         <div className="flex items-center gap-2">

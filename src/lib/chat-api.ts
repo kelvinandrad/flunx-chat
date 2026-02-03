@@ -5,6 +5,7 @@
  */
 
 import type {
+  ConversationListItem,
   ListConversationsParams,
   ListConversationsResponse,
   ListContactsParams,
@@ -12,9 +13,17 @@ import type {
   ListMessagesResponse,
   SendMessageBody,
   SendMessageResponse,
+  UpdateConversationBody,
 } from "./chat-api-types";
 
 const CHANNELS_API_URL = import.meta.env.VITE_CHANNELS_API_URL || "http://localhost:3001";
+
+/** Normaliza QR da API (qrcode.base64 ou qrCode) para data URL usada em <img src>. */
+export function normalizeQrCode(data: { qrCode?: string | null; qrcode?: { base64?: string } | string | null } | null): string | null {
+  const raw = data?.qrCode ?? (typeof data?.qrcode === "object" && data?.qrcode !== null ? (data.qrcode as { base64?: string }).base64 : data?.qrcode) ?? null;
+  if (!raw || typeof raw !== "string") return null;
+  return raw.startsWith("data:") ? raw : `data:image/png;base64,${raw}`;
+}
 
 function getAuthHeaders(accessToken: string): HeadersInit {
   return {
@@ -33,6 +42,8 @@ export async function listConversations(
   if (params?.days != null) searchParams.set("days", String(params.days));
   if (params?.before) searchParams.set("before", params.before);
   if (params?.only_with_messages === false) searchParams.set("only_with_messages", "false");
+  if (params?.include_archived === true) searchParams.set("include_archived", "true");
+  if (params?.pinned === true) searchParams.set("pinned", "true");
   const query = searchParams.toString();
   const url = `${CHANNELS_API_URL}/inboxes/${inboxId}/conversations${query ? `?${query}` : ""}`;
   const res = await fetch(url, {
@@ -95,7 +106,8 @@ export async function listMessages(
 
 export type SyncInboxResponse = {
   success: boolean;
-  chats_processed: number;
+  contacts_processed?: number;
+  chats_processed?: number;
   contacts_created: number;
   conversations_created: number;
 };
@@ -136,6 +148,23 @@ export async function sendMessage(
     throw err;
   }
   return data as SendMessageResponse;
+}
+
+export async function updateConversation(
+  conversationId: string,
+  accessToken: string,
+  body: UpdateConversationBody
+): Promise<ConversationListItem> {
+  const res = await fetch(`${CHANNELS_API_URL}/conversations/${conversationId}`, {
+    method: "PATCH",
+    headers: getAuthHeaders(accessToken),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+  }
+  return data as ConversationListItem;
 }
 
 export { CHANNELS_API_URL };

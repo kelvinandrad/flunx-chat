@@ -16,6 +16,8 @@ export type ConversationListItem = {
   id: string;
   contact: ConversationContact | null;
   labels?: string[];
+  is_archived?: boolean;
+  is_pinned?: boolean;
   preview: string | null;
   preview_at: string | null;
   status: string;
@@ -27,6 +29,14 @@ export type ListConversationsParams = {
   days?: number;
   before?: string; // cursor: updated_at ISO para carregar mais
   only_with_messages?: boolean; // default true: só conversas com pelo menos uma mensagem
+  include_archived?: boolean; // Fase C: listar arquivadas
+  pinned?: boolean; // true = só fixadas
+};
+
+export type UpdateConversationBody = {
+  labels?: string[];
+  is_archived?: boolean;
+  is_pinned?: boolean;
 };
 
 export type ContactListItem = {

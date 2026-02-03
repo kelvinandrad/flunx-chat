@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizeQrCode } from "@/lib/chat-api";
 import { supabase } from "@/integrations/supabase/client";
 import { QRCodeTimer } from "@/components/QRCodeTimer";
 
@@ -67,11 +68,11 @@ export function RefreshQRDialog({
           setTimeout(() => onOpenChangeRef.current(false), 1500);
           return;
         }
-        setQrCode(data.qrCode ?? null);
-        if (data.qrCode) {
+        setQrCode(normalizeQrCode(data) ?? null);
+        if (normalizeQrCode(data)) {
           setQrStartTime(Date.now());
         }
-        if (!data.qrCode && !data.connection_status) {
+        if (!normalizeQrCode(data) && !data.connection_status) {
           setErrorMessage(data?.error || "Não foi possível obter o QR Code.");
         }
       })

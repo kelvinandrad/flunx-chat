@@ -8,13 +8,23 @@ import type { ListConversationsResponse } from "@/lib/chat-api-types";
 const DEFAULT_LIMIT = 30;
 const DEFAULT_DAYS = 7;
 
-export function useConversations(inboxId: string | null | undefined) {
+export type UseConversationsFilter = {
+  includeArchived?: boolean;
+  pinnedOnly?: boolean;
+};
+
+export function useConversations(
+  inboxId: string | null | undefined,
+  filter?: UseConversationsFilter
+) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const token = session?.access_token ?? null;
+  const includeArchived = filter?.includeArchived ?? false;
+  const pinnedOnly = filter?.pinnedOnly ?? false;
 
   const query = useInfiniteQuery({
-    queryKey: ["chat_conversations", inboxId],
+    queryKey: ["chat_conversations", inboxId, includeArchived, pinnedOnly],
     queryFn: async ({
       pageParam,
     }: {
@@ -25,6 +35,8 @@ export function useConversations(inboxId: string | null | undefined) {
         limit: DEFAULT_LIMIT,
         days: pageParam == null ? DEFAULT_DAYS : undefined,
         before: pageParam ?? undefined,
+        include_archived: includeArchived || undefined,
+        pinned: pinnedOnly || undefined,
       });
     },
     getNextPageParam: (lastPage) => (lastPage.has_more ? lastPage.cursor : undefined),
@@ -33,7 +45,9 @@ export function useConversations(inboxId: string | null | undefined) {
   });
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["chat_conversations", inboxId] });
+    queryClient.invalidateQueries({
+      queryKey: ["chat_conversations", inboxId, includeArchived, pinnedOnly],
+    });
 
   // Realtime: conversas do inbox (novas conversas ou updated_at quando chega mensagem)
   useEffect(() => {
@@ -50,7 +64,12 @@ export function useConversations(inboxId: string | null | undefined) {
           filter: `inbox_id=eq.${inboxId}`,
         },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["chat_conversations", inboxId] });
+          queryClient.invalidateQueries({
+            predicate: (q) =>
+              Array.isArray(q.queryKey) &&
+              q.queryKey[0] === "chat_conversations" &&
+              q.queryKey[1] === inboxId,
+          });
         }
       )
       .subscribe();

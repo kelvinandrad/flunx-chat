@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizeQrCode } from "@/lib/chat-api";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
@@ -118,9 +119,9 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
       }
 
       setInboxId(data?.inbox?.id ?? null);
-      setQrCode(data?.qrCode ?? null);
+      setQrCode(normalizeQrCode(data) ?? null);
 
-      if (data?.qrCode) {
+      if (normalizeQrCode(data)) {
         setQrStartTime(Date.now());
         setStep("qrcode");
       } else if (data?.inbox?.connection_status === "connected") {
@@ -130,8 +131,10 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
           handleClose(false);
         }, 1500);
       } else {
-        setQrStartTime(Date.now());
-        setStep("qrcode");
+        setErrorMessage(
+          "Canal criado, mas não foi possível gerar o QR Code. Use \"Conectar\" no canal para gerar um novo QR."
+        );
+        setStep("error");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

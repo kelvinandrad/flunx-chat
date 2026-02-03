@@ -11,7 +11,7 @@ import { useConversations } from "@/hooks/useConversations";
 import { useMessages, useSendMessage } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
-import { listMessages } from "@/lib/chat-api";
+import { listMessages, updateConversation } from "@/lib/chat-api";
 import type { ConversationListItem, MessageListItem } from "@/lib/chat-api-types";
 import {
   useContactNotes,
@@ -95,6 +95,7 @@ export default function ChatPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
   const [isConversationsColumnOpen, setIsConversationsColumnOpen] = useState(true);
+  const [listView, setListView] = useState<"all" | "archived" | "pinned">("all");
   const [olderMessages, setOlderMessages] = useState<MessageListItem[]>([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -112,8 +113,25 @@ export default function ChatPage() {
     hasMore: hasMoreConversations,
     loadMore: loadMoreConversations,
     isLoadingMore: isLoadingMoreConversations,
-  } = useConversations(inboxIdForConversations);
+  } = useConversations(inboxIdForConversations, {
+    includeArchived: listView === "archived",
+    pinnedOnly: listView === "pinned",
+  });
   const conversations: Conversation[] = conversationsRaw.map(mapConversationListItemToConversation);
+
+  const handleUpdateConversationLabels = useCallback(
+    async (conversationId: string, labels: string[]) => {
+      if (!session?.access_token) return;
+      await updateConversation(conversationId, session.access_token, { labels });
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          q.queryKey[0] === "chat_conversations" &&
+          q.queryKey[1] === inboxIdForConversations,
+      });
+    },
+    [session?.access_token, queryClient, inboxIdForConversations]
+  );
 
   const { messages: messagesRaw, isLoading: messagesLoading, cursor, hasMore } = useMessages(
     selectedConversationId ?? null
@@ -379,6 +397,9 @@ export default function ChatPage() {
             hasMoreConversations={hasMoreConversations}
             onLoadMoreConversations={loadMoreConversations}
             isLoadingMoreConversations={isLoadingMoreConversations}
+            listView={listView}
+            onListViewChange={setListView}
+            onUpdateConversationLabels={handleUpdateConversationLabels}
           />
         )}
 

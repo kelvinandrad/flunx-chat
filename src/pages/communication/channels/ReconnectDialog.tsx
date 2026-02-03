@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizeQrCode } from "@/lib/chat-api";
 import { supabase } from "@/integrations/supabase/client";
 import { QRCodeTimer } from "@/components/QRCodeTimer";
 
@@ -122,7 +123,7 @@ export function ReconnectDialog({
         return;
       }
 
-      setQrCode(data.qrCode || null);
+      setQrCode(normalizeQrCode(data) || null);
       setQrStartTime(Date.now());
       setStep("qrcode");
     } catch (err) {

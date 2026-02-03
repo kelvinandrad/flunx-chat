@@ -146,9 +146,13 @@ export default function ChannelsList() {
     try {
       const result = await syncInbox(inboxId, session.access_token);
       await invalidate();
-      toast.success(
-        `Sincronização concluída: ${result.conversations_created} conversas criadas, ${result.contacts_created} contatos criados.`
-      );
+      const processed =
+        result.contacts_processed ?? result.chats_processed;
+      const msg =
+        processed != null
+          ? `Sincronização concluída: ${result.conversations_created} conversas criadas, ${result.contacts_created} contatos criados (${processed} processados).`
+          : `Sincronização concluída: ${result.conversations_created} conversas criadas, ${result.contacts_created} contatos criados.`;
+      toast.success(msg);
     } catch (e) {
       console.error("Erro ao sincronizar:", e);
       toast.error(e instanceof Error ? e.message : "Erro ao sincronizar conversas");
