@@ -39,6 +39,7 @@ async function refreshChannelInfo(channelId: string, accessToken: string | undef
 }
 
 export function useChannels() {
+  const { session } = useAuth();
   const { organizationId } = useTenant();
   const queryClient = useQueryClient();
   const refreshingRef = useRef<Set<string>>(new Set());

@@ -66,7 +66,8 @@ export async function listContacts(
   if (params?.limit != null) searchParams.set("limit", String(params.limit));
   if (params?.before) searchParams.set("before", params.before);
   const query = searchParams.toString();
-  const url = `${CHANNELS_API_URL}/inboxes/${inboxId}/contacts${query ? `?${query}` : ""}`;
+  // Trailing slash para evitar 404 intermitente no proxy (ex.: /contacts vs /contacts/)
+  const url = `${CHANNELS_API_URL}/inboxes/${inboxId}/contacts/${query ? `?${query}` : ""}`;
   const res = await fetch(url, {
     method: "GET",
     headers: getAuthHeaders(accessToken),

@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ConversationListPanel, Channel } from "./components/ConversationListPanel";
@@ -11,7 +12,7 @@ import { useConversations } from "@/hooks/useConversations";
 import { useMessages, useSendMessage } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
-import { listMessages, updateConversation } from "@/lib/chat-api";
+import { listMessages, updateConversation, syncInbox } from "@/lib/chat-api";
 import type { ConversationListItem, MessageListItem } from "@/lib/chat-api-types";
 import {
   useContactNotes,
@@ -87,6 +88,7 @@ function mapMessageListItemToMessage(msg: MessageListItem): Message {
 }
 
 export default function ChatPage() {
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const channelFromUrl = searchParams.get("channel");
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
@@ -99,11 +101,20 @@ export default function ChatPage() {
   const [olderMessages, setOlderMessages] = useState<MessageListItem[]>([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const autoSyncInboxesRef = useRef<Set<string>>(new Set());
+  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
 
   const { session } = useAuth();
   const { organizationId } = useTenant();
-  const { channels: inboxes } = useChannels();
+  const { channels: inboxes, invalidate: invalidateChannels } = useChannels();
   const channels: Channel[] = inboxes.map(mapInboxToChannel);
+
+  useEffect(() => {
+    if (channelFromUrl) return;
+    if (selectedChannelId !== "all") return;
+    if (channels.length === 0) return;
+    setSelectedChannelId(channels[0].id);
+  }, [channelFromUrl, selectedChannelId, channels]);
 
   const inboxIdForConversations =
     selectedChannelId && selectedChannelId !== "all" ? selectedChannelId : null;
@@ -113,11 +124,41 @@ export default function ChatPage() {
     hasMore: hasMoreConversations,
     loadMore: loadMoreConversations,
     isLoadingMore: isLoadingMoreConversations,
+    invalidate: invalidateConversations,
   } = useConversations(inboxIdForConversations, {
     includeArchived: listView === "archived",
     pinnedOnly: listView === "pinned",
   });
   const conversations: Conversation[] = conversationsRaw.map(mapConversationListItemToConversation);
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+    if (!inboxIdForConversations) return;
+    if (autoSyncInboxesRef.current.has(inboxIdForConversations)) return;
+    if (conversationsLoading) return;
+    if (conversations.length > 0) return;
+
+    autoSyncInboxesRef.current.add(inboxIdForConversations);
+    setIsAutoSyncing(true);
+    syncInbox(inboxIdForConversations, session.access_token)
+      .then(() => {
+        invalidateConversations();
+        invalidateChannels();
+      })
+      .catch((error) => {
+        console.error("[ChatPage] Auto sync inbox failed:", error);
+      })
+      .finally(() => {
+        setIsAutoSyncing(false);
+      });
+  }, [
+    session?.access_token,
+    inboxIdForConversations,
+    conversations.length,
+    conversationsLoading,
+    invalidateConversations,
+    invalidateChannels,
+  ]);
 
   const handleUpdateConversationLabels = useCallback(
     async (conversationId: string, labels: string[]) => {
@@ -386,21 +427,28 @@ export default function ChatPage() {
     <AppLayout>
       <div className="h-full flex-1 flex bg-background overflow-hidden min-h-0">
         {isConversationsColumnOpen && (
-          <ConversationListPanel
-            conversations={conversations}
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={setSelectedConversationId}
-            channels={channels}
-            selectedChannelId={selectedChannelId}
-            onSelectChannel={setSelectedChannelId}
-            isLoading={conversationsLoading}
-            hasMoreConversations={hasMoreConversations}
-            onLoadMoreConversations={loadMoreConversations}
-            isLoadingMoreConversations={isLoadingMoreConversations}
-            listView={listView}
-            onListViewChange={setListView}
-            onUpdateConversationLabels={handleUpdateConversationLabels}
-          />
+          <div className="flex flex-col border-r border-border/50 w-[360px] max-w-full">
+            {isAutoSyncing && (
+              <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/40">
+                Sincronizando conversas do canal selecionado...
+              </div>
+            )}
+            <ConversationListPanel
+              conversations={conversations}
+              selectedConversationId={selectedConversationId}
+              onSelectConversation={setSelectedConversationId}
+              channels={channels}
+              selectedChannelId={selectedChannelId}
+              onSelectChannel={setSelectedChannelId}
+              isLoading={conversationsLoading}
+              hasMoreConversations={hasMoreConversations}
+              onLoadMoreConversations={loadMoreConversations}
+              isLoadingMoreConversations={isLoadingMoreConversations}
+              listView={listView}
+              onListViewChange={setListView}
+              onUpdateConversationLabels={handleUpdateConversationLabels}
+            />
+          </div>
         )}
 
         <ChatArea
