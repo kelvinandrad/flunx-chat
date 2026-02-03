@@ -1,21 +1,34 @@
 import { useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { listConversations } from "@/lib/chat-api";
 import type { ListConversationsResponse } from "@/lib/chat-api-types";
+
+const DEFAULT_LIMIT = 30;
+const DEFAULT_DAYS = 7;
 
 export function useConversations(inboxId: string | null | undefined) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const token = session?.access_token ?? null;
 
-  const query = useQuery({
+  const query = useInfiniteQuery({
     queryKey: ["chat_conversations", inboxId],
-    queryFn: async (): Promise<ListConversationsResponse> => {
+    queryFn: async ({
+      pageParam,
+    }: {
+      pageParam?: string | null;
+    }): Promise<ListConversationsResponse> => {
       if (!inboxId || !token) throw new Error("inboxId and auth required");
-      return listConversations(inboxId, token);
+      return listConversations(inboxId, token, {
+        limit: DEFAULT_LIMIT,
+        days: pageParam == null ? DEFAULT_DAYS : undefined,
+        before: pageParam ?? undefined,
+      });
     },
+    getNextPageParam: (lastPage) => (lastPage.has_more ? lastPage.cursor : undefined),
+    initialPageParam: null as string | null,
     enabled: !!inboxId && !!token,
   });
 
@@ -47,9 +60,17 @@ export function useConversations(inboxId: string | null | undefined) {
     };
   }, [inboxId, queryClient]);
 
+  const conversations = (query.data?.pages ?? []).flatMap((p) => p.conversations);
+  const hasMore = query.hasNextPage ?? false;
+  const fetchNextPage = query.fetchNextPage;
+  const isFetchingNextPage = query.isFetchingNextPage;
+
   return {
     ...query,
-    conversations: query.data?.conversations ?? [],
+    conversations,
+    hasMore,
+    loadMore: fetchNextPage,
+    isLoadingMore: isFetchingNextPage,
     invalidate,
   };
 }

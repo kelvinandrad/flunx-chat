@@ -5,7 +5,10 @@
  */
 
 import type {
+  ListConversationsParams,
   ListConversationsResponse,
+  ListContactsParams,
+  ListContactsResponse,
   ListMessagesResponse,
   SendMessageBody,
   SendMessageResponse,
@@ -22,9 +25,17 @@ function getAuthHeaders(accessToken: string): HeadersInit {
 
 export async function listConversations(
   inboxId: string,
-  accessToken: string
+  accessToken: string,
+  params?: ListConversationsParams
 ): Promise<ListConversationsResponse> {
-  const res = await fetch(`${CHANNELS_API_URL}/inboxes/${inboxId}/conversations`, {
+  const searchParams = new URLSearchParams();
+  if (params?.limit != null) searchParams.set("limit", String(params.limit));
+  if (params?.days != null) searchParams.set("days", String(params.days));
+  if (params?.before) searchParams.set("before", params.before);
+  if (params?.only_with_messages === false) searchParams.set("only_with_messages", "false");
+  const query = searchParams.toString();
+  const url = `${CHANNELS_API_URL}/inboxes/${inboxId}/conversations${query ? `?${query}` : ""}`;
+  const res = await fetch(url, {
     method: "GET",
     headers: getAuthHeaders(accessToken),
   });
@@ -33,6 +44,27 @@ export async function listConversations(
     throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
   }
   return data as ListConversationsResponse;
+}
+
+export async function listContacts(
+  inboxId: string,
+  accessToken: string,
+  params?: ListContactsParams
+): Promise<ListContactsResponse> {
+  const searchParams = new URLSearchParams();
+  if (params?.limit != null) searchParams.set("limit", String(params.limit));
+  if (params?.before) searchParams.set("before", params.before);
+  const query = searchParams.toString();
+  const url = `${CHANNELS_API_URL}/inboxes/${inboxId}/contacts${query ? `?${query}` : ""}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: getAuthHeaders(accessToken),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+  }
+  return data as ListContactsResponse;
 }
 
 export interface ListMessagesParams {

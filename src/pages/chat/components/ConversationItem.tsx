@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Users } from "lucide-react";
 
 export interface Conversation {
   id: string;
@@ -9,6 +10,7 @@ export interface Conversation {
     name: string;
     avatar?: string;
     phone?: string;
+    contactType?: "individual" | "group";
   };
   lastMessage: {
     content: string;
@@ -30,6 +32,7 @@ interface ConversationItemProps {
 
 export function ConversationItem({ conversation, isSelected, onClick }: ConversationItemProps) {
   const { contact, lastMessage, unreadCount, isTyping, isOnline, labels } = conversation;
+  const isGroup = contact.contactType === "group";
 
   const getInitials = (name: string) => {
     return name
@@ -72,7 +75,11 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
         <Avatar className="h-12 w-12">
           <AvatarImage src={contact.avatar} alt={contact.name} />
           <AvatarFallback className="bg-primary/10 text-primary font-medium">
-            {getInitials(contact.name)}
+            {isGroup ? (
+              <Users className="h-6 w-6 text-primary" />
+            ) : (
+              getInitials(contact.name)
+            )}
           </AvatarFallback>
         </Avatar>
         {isOnline && (
@@ -84,9 +91,10 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
           <span className={cn(
-            "font-medium truncate",
+            "font-medium truncate flex items-center gap-1.5",
             unreadCount > 0 && "text-foreground"
           )}>
+            {isGroup && <Users className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />}
             {contact.name}
           </span>
           <span className={cn(

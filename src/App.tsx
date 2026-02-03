@@ -17,6 +17,7 @@ import CreateOrganization from "./pages/auth/CreateOrganization";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ChatPage from "./pages/chat/ChatPage";
+import ContatosPage from "./pages/ContatosPage";
 import ChannelsList from "./pages/communication/channels/ChannelsList";
 import SettingsChat from "./pages/settings/SettingsChat";
 
@@ -75,6 +76,7 @@ const AppRoutes = () => (
 
     <Route path="/" element={<ProtectedRoute><RequireOrganization><Index /></RequireOrganization></ProtectedRoute>} />
     <Route path="/chat" element={<ProtectedRoute><RequireOrganization><ChatPage /></RequireOrganization></ProtectedRoute>} />
+    <Route path="/contatos" element={<ProtectedRoute><RequireOrganization><ContatosPage /></RequireOrganization></ProtectedRoute>} />
     <Route path="/canais" element={<ProtectedRoute><RequireOrganization><ChannelsList /></RequireOrganization></ProtectedRoute>} />
     <Route path="/configuracoes" element={<ProtectedRoute><RequireOrganization><SettingsChat /></RequireOrganization></ProtectedRoute>} />
 

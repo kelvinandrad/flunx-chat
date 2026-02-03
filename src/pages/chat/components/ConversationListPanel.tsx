@@ -17,7 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Search, Filter, X, ChevronDown, Check } from "lucide-react";
+import { Search, Filter, X, ChevronDown, Check, Loader2 } from "lucide-react";
 import { ConversationItem, Conversation } from "./ConversationItem";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,9 @@ interface ConversationListPanelProps {
   selectedChannelId: string | null;
   onSelectChannel: (channelId: string) => void;
   isLoading?: boolean;
+  hasMoreConversations?: boolean;
+  onLoadMoreConversations?: () => void;
+  isLoadingMoreConversations?: boolean;
 }
 
 type FilterTab = "all" | "unread" | "open" | "pending" | "resolved";
@@ -68,6 +71,9 @@ export function ConversationListPanel({
   selectedChannelId,
   onSelectChannel,
   isLoading,
+  hasMoreConversations,
+  onLoadMoreConversations,
+  isLoadingMoreConversations,
 }: ConversationListPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
@@ -404,14 +410,36 @@ export function ConversationListPanel({
             </p>
           </div>
         ) : (
-          filteredConversations.map((conversation) => (
-            <ConversationItem
-              key={conversation.id}
-              conversation={conversation}
-              isSelected={selectedConversationId === conversation.id}
-              onClick={() => onSelectConversation(conversation.id)}
-            />
-          ))
+          <>
+            {filteredConversations.map((conversation) => (
+              <ConversationItem
+                key={conversation.id}
+                conversation={conversation}
+                isSelected={selectedConversationId === conversation.id}
+                onClick={() => onSelectConversation(conversation.id)}
+              />
+            ))}
+            {hasMoreConversations && onLoadMoreConversations && (
+              <div className="p-3 flex justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => onLoadMoreConversations()}
+                  disabled={isLoadingMoreConversations}
+                >
+                  {isLoadingMoreConversations ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Carregando...
+                    </>
+                  ) : (
+                    "Carregar mais conversas"
+                  )}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </ScrollArea>
     </div>

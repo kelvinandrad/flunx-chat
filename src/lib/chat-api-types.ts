@@ -8,19 +8,51 @@ export type ConversationContact = {
   id: string;
   name: string | null;
   remote_jid: string | null;
+  contact_type?: "individual" | "group";
+  avatar_url?: string | null;
 };
 
 export type ConversationListItem = {
   id: string;
   contact: ConversationContact | null;
+  labels?: string[];
   preview: string | null;
   preview_at: string | null;
   status: string;
   updated_at: string;
 };
 
+export type ListConversationsParams = {
+  limit?: number;
+  days?: number;
+  before?: string; // cursor: updated_at ISO para carregar mais
+  only_with_messages?: boolean; // default true: só conversas com pelo menos uma mensagem
+};
+
+export type ContactListItem = {
+  id: string;
+  name: string | null;
+  remote_jid: string | null;
+  contact_type?: "individual" | "group";
+  avatar_url?: string | null;
+  updated_at: string;
+};
+
+export type ListContactsParams = {
+  limit?: number;
+  before?: string; // cursor: updated_at ISO
+};
+
+export type ListContactsResponse = {
+  contacts: ContactListItem[];
+  has_more: boolean;
+  cursor: string | null;
+};
+
 export type ListConversationsResponse = {
   conversations: ConversationListItem[];
+  has_more: boolean;
+  cursor: string | null;
 };
 
 export type MessageListItem = {
@@ -31,6 +63,7 @@ export type MessageListItem = {
   status: string;
   created_at: string;
   evolution_message_id: string | null;
+  participant_remote_jid?: string | null; // em grupos: JID de quem enviou
 };
 
 export type ListMessagesResponse = {

@@ -9,6 +9,8 @@ export interface Message {
   status?: "sending" | "sent" | "delivered" | "read" | "failed";
   type?: "text" | "image" | "audio" | "video" | "document";
   mediaUrl?: string;
+  /** Em grupos: nome/número de quem enviou (quando isFromContact) */
+  senderName?: string;
   replyTo?: {
     id: string;
     content: string;
@@ -24,7 +26,7 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, showAvatar, contactName }: MessageBubbleProps) {
-  const { content, timestamp, isFromContact, status, replyTo } = message;
+  const { content, timestamp, isFromContact, status, replyTo, senderName } = message;
 
   const formatTime = (ts: string) => {
     return new Date(ts).toLocaleTimeString("pt-BR", {
@@ -78,6 +80,11 @@ export function MessageBubble({ message, showAvatar, contactName }: MessageBubbl
             <p className="font-medium">{replyTo.contactName}</p>
             <p className="truncate">{replyTo.content}</p>
           </div>
+        )}
+
+        {/* Sender name (grupos: quem enviou) */}
+        {isFromContact && senderName && (
+          <p className="text-xs font-medium text-muted-foreground mb-1">{senderName}</p>
         )}
 
         {/* Message content */}

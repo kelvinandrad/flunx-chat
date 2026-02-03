@@ -50,7 +50,9 @@ function mapConversationListItemToConversation(item: ConversationListItem): Conv
     contact: {
       id: item.contact?.id ?? "",
       name: contactName,
+      avatar: item.contact?.avatar_url ?? undefined,
       phone: item.contact?.remote_jid ?? undefined,
+      contactType: item.contact?.contact_type ?? "individual",
     },
     lastMessage: {
       content: item.preview ?? "",
@@ -59,16 +61,28 @@ function mapConversationListItemToConversation(item: ConversationListItem): Conv
     },
     unreadCount: 0,
     status: (item.status as Conversation["status"]) ?? "open",
+    labels: item.labels && item.labels.length > 0 ? item.labels : undefined,
   };
 }
 
+function formatJidAsPhone(jid: string): string {
+  const num = jid.replace(/@.*$/, "").replace(/^55/, "");
+  if (num.length === 11) return `(${num.slice(0, 2)}) ${num.slice(2, 7)}-${num.slice(7)}`;
+  if (num.length === 10) return `(${num.slice(0, 2)}) ${num.slice(2, 6)}-${num.slice(6)}`;
+  return num || jid;
+}
+
 function mapMessageListItemToMessage(msg: MessageListItem): Message {
+  const senderName = msg.participant_remote_jid
+    ? formatJidAsPhone(msg.participant_remote_jid)
+    : undefined;
   return {
     id: msg.id,
     content: msg.content,
     timestamp: msg.created_at,
     isFromContact: msg.direction === "incoming",
     status: msg.status === "failed" ? "failed" : msg.status === "sent" ? "sent" : "delivered",
+    senderName,
   };
 }
 
@@ -92,8 +106,13 @@ export default function ChatPage() {
 
   const inboxIdForConversations =
     selectedChannelId && selectedChannelId !== "all" ? selectedChannelId : null;
-  const { conversations: conversationsRaw, isLoading: conversationsLoading } =
-    useConversations(inboxIdForConversations);
+  const {
+    conversations: conversationsRaw,
+    isLoading: conversationsLoading,
+    hasMore: hasMoreConversations,
+    loadMore: loadMoreConversations,
+    isLoadingMore: isLoadingMoreConversations,
+  } = useConversations(inboxIdForConversations);
   const conversations: Conversation[] = conversationsRaw.map(mapConversationListItemToConversation);
 
   const { messages: messagesRaw, isLoading: messagesLoading, cursor, hasMore } = useMessages(
@@ -357,6 +376,9 @@ export default function ChatPage() {
             selectedChannelId={selectedChannelId}
             onSelectChannel={setSelectedChannelId}
             isLoading={conversationsLoading}
+            hasMoreConversations={hasMoreConversations}
+            onLoadMoreConversations={loadMoreConversations}
+            isLoadingMoreConversations={isLoadingMoreConversations}
           />
         )}
 
