@@ -16,7 +16,11 @@ import type {
   UpdateConversationBody,
 } from "./chat-api-types";
 
-const CHANNELS_API_URL = import.meta.env.VITE_CHANNELS_API_URL || "http://localhost:3001";
+const CHANNELS_API_URL =
+  import.meta.env.VITE_EVOLUTION_API_URL || import.meta.env.VITE_CHANNELS_API_URL || "http://localhost:3001";
+
+/** Duração do QR na Evolution (renovação típica ~45s). Sincroniza o contador do modal com o intervalo entre qrcode.updated. */
+export const QR_CODE_VALIDITY_MS = 45 * 1000;
 
 /** Normaliza QR da API (qrcode.base64 ou qrCode) para data URL usada em <img src>. */
 export function normalizeQrCode(data: { qrCode?: string | null; qrcode?: { base64?: string } | string | null } | null): string | null {

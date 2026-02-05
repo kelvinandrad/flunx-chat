@@ -11,13 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { normalizeQrCode } from "@/lib/chat-api";
+import { normalizeQrCode, QR_CODE_VALIDITY_MS } from "@/lib/chat-api";
 import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { QRCodeTimer } from "@/components/QRCodeTimer";
 
-const CHANNELS_API_URL = import.meta.env.VITE_CHANNELS_API_URL || "http://localhost:3001";
+const CHANNELS_API_URL =
+  import.meta.env.VITE_EVOLUTION_API_URL || import.meta.env.VITE_CHANNELS_API_URL || "http://localhost:3001";
 
 type Step = "form" | "loading" | "qrcode" | "done" | "error";
 
@@ -70,6 +71,33 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       pollRef.current = null;
+    };
+  }, [step, inboxId]);
+
+  // Realtime: quando o worker recebe qrcode.updated e atualiza chat_inboxes.qr_code, atualizar o QR na tela
+  useEffect(() => {
+    if (step !== "qrcode" || !inboxId) return;
+    const channel = supabase
+      .channel(`create-channel-qr-${inboxId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "chat_inboxes", filter: `id=eq.${inboxId}` },
+        (payload) => {
+          const row = payload.new as { qr_code?: string | null; qr_code_generated_at?: string | null };
+          const newQr = row?.qr_code;
+          if (newQr && typeof newQr === "string") {
+            setQrCode(newQr.startsWith("data:") ? newQr : `data:image/png;base64,${newQr}`);
+            const generatedAt = row?.qr_code_generated_at;
+            setQrStartTime(
+              generatedAt ? new Date(generatedAt).getTime() : Date.now()
+            );
+            setQrExpired(false);
+          }
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
     };
   }, [step, inboxId]);
 
@@ -141,7 +169,7 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
       const isNetworkError = msg === "Failed to fetch" || msg.includes("NetworkError") || msg.includes("CONNECTION_REFUSED");
       setErrorMessage(
         isNetworkError
-          ? "Serviço de canais indisponível. Verifique se a API está em execução (ex.: flunx-channels-api na porta 3001) ou a URL configurada (VITE_CHANNELS_API_URL)."
+          ? "Serviço de canais indisponível. Verifique se a API está em execução (flunx-evolution-api na porta 3001) ou a URL (VITE_EVOLUTION_API_URL / VITE_CHANNELS_API_URL)."
           : msg
       );
       setStep("error");
@@ -225,7 +253,7 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
                 {qrStartTime > 0 && (
                   <QRCodeTimer
                     startTime={qrStartTime}
-                    durationMs={POLL_TIMEOUT_MS}
+                    durationMs={QR_CODE_VALIDITY_MS}
                     onExpire={() => setQrExpired(true)}
                   />
                 )}

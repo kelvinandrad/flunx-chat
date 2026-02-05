@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenant } from "@/contexts/TenantContext";
 import { useAuth } from "@/contexts/AuthContext";
 
-const CHANNELS_API_URL = import.meta.env.VITE_CHANNELS_API_URL || "http://localhost:3001";
+const CHANNELS_API_URL =
+  import.meta.env.VITE_EVOLUTION_API_URL || import.meta.env.VITE_CHANNELS_API_URL || "http://localhost:3001";
 
 export type ChatInbox = {
   id: string;
@@ -15,6 +16,7 @@ export type ChatInbox = {
   evolution_base_url: string | null;
   connection_status: "pending" | "connected" | "disconnected" | "error";
   qr_code: string | null;
+  qr_code_generated_at: string | null;
   // WhatsApp profile data
   whatsapp_profile_name: string | null;
   whatsapp_profile_pic_url: string | null;
@@ -84,38 +86,34 @@ export function useChannels() {
     });
   }, [query.data, session?.access_token]);
 
-  // Supabase Realtime: escuta mudanças na tabela chat_inboxes
+  // Supabase Realtime: atualiza a lista de canais quando connection_status ou qr_code mudam
+  // (ex.: quando o worker processa CONNECTION_UPDATE e marca o canal como conectado).
+  // Requer: tabela chat_inboxes na publicação "supabase_realtime" (Dashboard > Database > Replication).
   useEffect(() => {
-    if (!organizationId) return;
+    if (!organizationId || !session) return;
 
     const channel = supabase
       .channel(`chat_inboxes_${organizationId}`)
       .on(
         "postgres_changes",
         {
-          event: "*", // INSERT, UPDATE, DELETE
+          event: "*",
           schema: "public",
           table: "chat_inboxes",
           filter: `organization_id=eq.${organizationId}`,
         },
-        async (payload) => {
-          console.log("[Realtime] chat_inboxes changed:", payload.eventType);
-
-          // Se um canal acabou de conectar, aguarda um pouco e força refresh dos dados
+        (payload) => {
           const newData = payload.new as ChatInbox | undefined;
           if (
             payload.eventType === "UPDATE" &&
             newData?.connection_status === "connected" &&
             newData?.contacts_count === 0
           ) {
-            // Aguarda 2s para Evolution sincronizar os contatos
-            setTimeout(async () => {
-              await refreshChannelInfo(newData.id, session?.access_token);
+            setTimeout(() => {
+              refreshChannelInfo(newData.id, session?.access_token);
               invalidate();
             }, 2000);
           }
-
-          // Invalida a query para refetch dos dados atualizados
           invalidate();
         }
       )
@@ -124,7 +122,7 @@ export function useChannels() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [organizationId, queryClient, session?.access_token]);
+  }, [organizationId, session, queryClient]);
 
   return { ...query, channels: query.data ?? [], invalidate };
 }
