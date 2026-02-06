@@ -115,13 +115,26 @@ export type SyncInboxResponse = {
   chats_processed?: number;
   contacts_created: number;
   conversations_created: number;
+  messages_inserted?: number;
+};
+
+export type SyncInboxOptions = {
+  /** Importar mensagens dos últimos N dias (Evolution findMessages por conversa). 0 = não importar. */
+  import_messages_days?: number;
 };
 
 export async function syncInbox(
   inboxId: string,
-  accessToken: string
+  accessToken: string,
+  options?: SyncInboxOptions
 ): Promise<SyncInboxResponse> {
-  const res = await fetch(`${CHANNELS_API_URL}/inboxes/${inboxId}/sync`, {
+  const params = new URLSearchParams();
+  if (options?.import_messages_days != null && options.import_messages_days > 0) {
+    params.set("import_messages_days", String(options.import_messages_days));
+  }
+  const query = params.toString();
+  const url = `${CHANNELS_API_URL}/inboxes/${inboxId}/sync${query ? `?${query}` : ""}`;
+  const res = await fetch(url, {
     method: "POST",
     headers: getAuthHeaders(accessToken),
   });

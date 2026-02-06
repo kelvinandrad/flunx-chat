@@ -140,10 +140,17 @@ export default function ChatPage() {
 
     autoSyncInboxesRef.current.add(inboxIdForConversations);
     setIsAutoSyncing(true);
-    syncInbox(inboxIdForConversations, session.access_token)
-      .then(() => {
+    syncInbox(inboxIdForConversations, session.access_token, { import_messages_days: 7 })
+      .then((result) => {
         invalidateConversations();
         invalidateChannels();
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[ChatPage] Sync concluído:", {
+            conversations_created: result.conversations_created,
+            contacts_created: result.contacts_created,
+            messages_inserted: result.messages_inserted,
+          });
+        }
       })
       .catch((error) => {
         console.error("[ChatPage] Auto sync inbox failed:", error);

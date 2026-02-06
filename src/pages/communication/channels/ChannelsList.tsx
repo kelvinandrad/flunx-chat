@@ -403,14 +403,42 @@ export default function ChannelsList() {
       <CreateChannelDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        onSuccess={invalidate}
+        onSuccess={(inboxId) => {
+          if (inboxId && session?.access_token) {
+            syncInbox(inboxId, session.access_token, { import_messages_days: 7 })
+              .then(() => {
+                invalidate();
+                toast.success("Canal conectado. Histórico dos últimos 7 dias está sendo importado.");
+              })
+              .catch(() => {
+                invalidate();
+                toast.info("Canal conectado. Sincronize manualmente para importar histórico.");
+              });
+          } else {
+            invalidate();
+          }
+        }}
       />
       <RefreshQRDialog
         open={refreshQROpen}
         onOpenChange={(open) => !open && closeRefreshQR()}
         inboxId={refreshQRInboxId}
         channelName={refreshQRChannelName}
-        onSuccess={invalidate}
+        onSuccess={(inboxId) => {
+          if (inboxId && session?.access_token) {
+            syncInbox(inboxId, session.access_token, { import_messages_days: 7 })
+              .then(() => {
+                invalidate();
+                toast.success("Canal reconectado. Histórico dos últimos 7 dias está sendo importado.");
+              })
+              .catch(() => {
+                invalidate();
+                toast.info("Canal reconectado. Sincronize manualmente para importar histórico.");
+              });
+          } else {
+            invalidate();
+          }
+        }}
       />
       <DeleteChannelDialog
         open={deleteOpen}

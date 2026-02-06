@@ -37,6 +37,7 @@ export function useConversations(
         before: pageParam ?? undefined,
         include_archived: includeArchived || undefined,
         pinned: pinnedOnly || undefined,
+        only_with_messages: true, // só conversas com mensagens (igual WhatsApp Web); contatos sem conversa não aparecem na lista
       });
     },
     getNextPageParam: (lastPage) => (lastPage.has_more ? lastPage.cursor : undefined),

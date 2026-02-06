@@ -24,7 +24,8 @@ interface RefreshQRDialogProps {
   onOpenChange: (open: boolean) => void;
   inboxId: string | null;
   channelName: string;
-  onSuccess: () => void;
+  /** Chamado ao conectar; recebe o inboxId (para sync com histórico). */
+  onSuccess: (inboxId?: string) => void;
 }
 
 export function RefreshQRDialog({
@@ -53,7 +54,7 @@ export function RefreshQRDialog({
       pollRef.current = null;
     }
     setConnected(true);
-    onSuccessRef.current();
+    onSuccessRef.current(inboxId ?? undefined);
     setTimeout(() => onOpenChangeRef.current(false), 1500);
   };
 

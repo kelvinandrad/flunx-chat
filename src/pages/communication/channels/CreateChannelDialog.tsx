@@ -25,7 +25,8 @@ type Step = "form" | "loading" | "qrcode" | "done" | "error";
 interface CreateChannelDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  /** Chamado ao conectar; recebe o inboxId do canal criado (para sync com histórico). */
+  onSuccess: (inboxId?: string) => void;
 }
 
 export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateChannelDialogProps) {
@@ -64,7 +65,7 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
         if (pollRef.current) clearInterval(pollRef.current);
         pollRef.current = null;
         setStep("done");
-        onSuccessRef.current();
+        onSuccessRef.current(inboxId ?? undefined);
         setTimeout(() => handleClose(false), 1500);
       }
     }, POLL_INTERVAL_MS);
