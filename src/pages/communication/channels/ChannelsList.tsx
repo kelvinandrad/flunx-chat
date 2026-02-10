@@ -17,6 +17,7 @@ import {
   Download,
   Users,
   MessageSquare,
+  Settings,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useChannels } from "@/hooks/useChannels";
@@ -27,6 +28,7 @@ import { CreateChannelDialog } from "./CreateChannelDialog";
 import { RefreshQRDialog } from "./RefreshQRDialog";
 import { DeleteChannelDialog } from "./DeleteChannelDialog";
 import { ReconnectDialog } from "./ReconnectDialog";
+import { ChannelImportConfigDialog } from "./ChannelImportConfigDialog";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -101,6 +103,7 @@ export default function ChannelsList() {
   const [reconnectChannelName, setReconnectChannelName] = useState("");
   const [reconnectIsConnected, setReconnectIsConnected] = useState(false);
   const [syncingInboxId, setSyncingInboxId] = useState<string | null>(null);
+  const [configChannel, setConfigChannel] = useState<{ id: string; name: string } | null>(null);
 
   const openRefreshQR = (inboxId: string, channelName: string) => {
     setRefreshQRInboxId(inboxId);
@@ -141,21 +144,19 @@ export default function ChannelsList() {
   };
 
   const handleSync = async (inboxId: string) => {
-    if (!session?.access_token) return;
+    const token = session?.access_token;
+    if (!token) {
+      toast.error("Faça login para sincronizar.");
+      return;
+    }
     setSyncingInboxId(inboxId);
     try {
-      const result = await syncInbox(inboxId, session.access_token);
+      await syncInbox(inboxId, token);
       await invalidate();
-      const processed =
-        result.contacts_processed ?? result.chats_processed;
-      const msg =
-        processed != null
-          ? `Sincronização concluída: ${result.conversations_created} conversas criadas, ${result.contacts_created} contatos criados (${processed} processados).`
-          : `Sincronização concluída: ${result.conversations_created} conversas criadas, ${result.contacts_created} contatos criados.`;
-      toast.success(msg);
+      toast.success("Sincronização concluída. Contatos e conversas atualizados.");
     } catch (e) {
-      console.error("Erro ao sincronizar:", e);
-      toast.error(e instanceof Error ? e.message : "Erro ao sincronizar conversas");
+      const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
+      toast.error(msg);
     } finally {
       setSyncingInboxId(null);
     }
@@ -254,6 +255,8 @@ export default function ChannelsList() {
               const Icon = getChannelIcon(channel.channel_type);
               const isConnected = channel.connection_status === "connected";
               const hasProfile = isConnected && channel.whatsapp_profile_name;
+              const displayName =
+                hasProfile ? channel.whatsapp_profile_name! : channel.name;
               return (
                 <Card
                   key={channel.id}
@@ -277,7 +280,7 @@ export default function ChannelsList() {
                         )}
                         <div className="min-w-0 flex-1">
                           <h3 className="font-semibold text-foreground truncate">
-                            {channel.name}
+                            {displayName}
                           </h3>
                           {hasProfile && channel.whatsapp_phone_number && (
                             <p className="text-xs text-muted-foreground">{channel.whatsapp_phone_number}</p>
@@ -343,7 +346,7 @@ export default function ChannelsList() {
                             variant="outline"
                             size="sm"
                             className="gap-1.5 rounded-lg flex-1 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
-                            onClick={() => openRefreshQR(channel.id, channel.name)}
+                            onClick={() => openRefreshQR(channel.id, displayName)}
                           >
                             <QrCode className="h-3.5 w-3.5" />
                             Conectar
@@ -355,7 +358,7 @@ export default function ChannelsList() {
                             variant="outline"
                             size="sm"
                             className="gap-1.5 rounded-lg border-primary/30 text-primary hover:bg-primary/10"
-                            onClick={() => openReconnect(channel.id, channel.name, isConnected)}
+                            onClick={() => openReconnect(channel.id, displayName, isConnected)}
                           >
                             <RefreshCw className="h-3.5 w-3.5" />
                             Reconectar
@@ -378,13 +381,25 @@ export default function ChannelsList() {
                             Sincronizar
                           </Button>
                         )}
+                        {/* Configuração: importação automática ao conectar (estilo Chatwoot) */}
+                        {channel.channel_type === "whatsapp" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 rounded-lg border-muted-foreground/30 text-muted-foreground hover:bg-muted/50"
+                            onClick={() => setConfigChannel({ id: channel.id, name: displayName })}
+                          >
+                            <Settings className="h-3.5 w-3.5" />
+                            Config
+                          </Button>
+                        )}
                         {/* Botão Excluir */}
                         {channel.channel_type === "whatsapp" && (
                           <Button
                             variant="outline"
                             size="sm"
                             className="gap-1.5 rounded-lg border-destructive/30 text-destructive hover:bg-destructive/10"
-                            onClick={() => openDelete(channel.id, channel.name)}
+                            onClick={() => openDelete(channel.id, displayName)}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             Excluir
@@ -404,16 +419,9 @@ export default function ChannelsList() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSuccess={(inboxId) => {
-          if (inboxId && session?.access_token) {
-            syncInbox(inboxId, session.access_token, { import_messages_days: 7 })
-              .then(() => {
-                invalidate();
-                toast.success("Canal conectado. Histórico dos últimos 7 dias está sendo importado.");
-              })
-              .catch(() => {
-                invalidate();
-                toast.info("Canal conectado. Sincronize manualmente para importar histórico.");
-              });
+          if (inboxId) {
+            invalidate();
+            toast.success("Canal conectado. Dados e etiquetas serão atualizados via webhook.");
           } else {
             invalidate();
           }
@@ -425,16 +433,9 @@ export default function ChannelsList() {
         inboxId={refreshQRInboxId}
         channelName={refreshQRChannelName}
         onSuccess={(inboxId) => {
-          if (inboxId && session?.access_token) {
-            syncInbox(inboxId, session.access_token, { import_messages_days: 7 })
-              .then(() => {
-                invalidate();
-                toast.success("Canal reconectado. Histórico dos últimos 7 dias está sendo importado.");
-              })
-              .catch(() => {
-                invalidate();
-                toast.info("Canal reconectado. Sincronize manualmente para importar histórico.");
-              });
+          if (inboxId) {
+            invalidate();
+            toast.success("Canal reconectado.");
           } else {
             invalidate();
           }
@@ -459,6 +460,15 @@ export default function ChannelsList() {
         onSuccess={() => {
           invalidate();
           closeReconnect();
+        }}
+      />
+      <ChannelImportConfigDialog
+        open={!!configChannel}
+        onOpenChange={(open) => !open && setConfigChannel(null)}
+        channel={configChannel ? channels.find((c) => c.id === configChannel.id) ?? null : null}
+        onSuccess={() => {
+          invalidate();
+          toast.success("Configuração de sincronização automática salva.");
         }}
       />
     </AppLayout>

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { MessageBubble, DateSeparator, Message } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
+import { PlayingAudioProvider } from "../contexts/PlayingAudioContext";
 import { cn } from "@/lib/utils";
 
 interface Contact {
@@ -308,18 +309,21 @@ export function ChatArea({
                 </Button>
               </div>
             )}
-            {Object.entries(groupedMessages).map(([date, dayMessages]) => (
-              <div key={date}>
-                <DateSeparator date={date} />
-                {dayMessages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                    contactName={contact.name}
-                  />
-                ))}
-              </div>
-            ))}
+            <PlayingAudioProvider>
+              {Object.entries(groupedMessages).map(([date, dayMessages]) => (
+                <div key={date}>
+                  <DateSeparator date={date} />
+                  {dayMessages.map((message) => (
+                    <MessageBubble
+                      key={message.id}
+                      message={message}
+                      contactName={contact.name}
+                      contactAvatar={contact.avatar}
+                    />
+                  ))}
+                </div>
+              ))}
+            </PlayingAudioProvider>
           </>
         )}
       </div>

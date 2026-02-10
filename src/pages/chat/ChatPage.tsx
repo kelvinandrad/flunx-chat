@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -9,10 +9,11 @@ import { Message } from "./components/MessageBubble";
 import { ContactPanel } from "./components/ContactPanel";
 import { useChannels } from "@/hooks/useChannels";
 import { useConversations } from "@/hooks/useConversations";
+import { useInboxLabels } from "@/hooks/useInboxLabels";
 import { useMessages, useSendMessage } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
-import { listMessages, updateConversation, syncInbox } from "@/lib/chat-api";
+import { listMessages, updateConversation } from "@/lib/chat-api";
 import type { ConversationListItem, MessageListItem } from "@/lib/chat-api-types";
 import {
   useContactNotes,
@@ -27,6 +28,8 @@ function mapInboxToChannel(inbox: {
   channel_type: string;
   connection_status: string;
   whatsapp_phone_number?: string | null;
+  whatsapp_profile_name?: string | null;
+  whatsapp_profile_pic_url?: string | null;
 }): Channel {
   const status =
     inbox.connection_status === "connected"
@@ -34,18 +37,45 @@ function mapInboxToChannel(inbox: {
       : inbox.connection_status === "pending"
         ? "connecting"
         : "disconnected";
+  const isConnected = status === "connected";
+  const displayName =
+    isConnected && inbox.whatsapp_profile_name?.trim()
+      ? inbox.whatsapp_profile_name.trim()
+      : inbox.name;
   return {
     id: inbox.id,
-    name: inbox.name,
+    name: displayName,
     type: (inbox.channel_type as Channel["type"]) || "whatsapp",
     phoneNumber: inbox.whatsapp_phone_number ?? undefined,
+    avatar: isConnected ? inbox.whatsapp_profile_pic_url ?? undefined : undefined,
     unreadCount: 0,
     status,
   };
 }
 
+/** Fallback quando não há nome: número extraído do JID ou o próprio JID (nunca "Contato"). */
+function displayNameFromRemoteJid(remoteJid: string | null | undefined): string {
+  const jid = (remoteJid ?? "").trim();
+  if (!jid) return "";
+  const beforeAt = jid.split("@")[0];
+  if (beforeAt && /^\+?\d+$/.test(beforeAt)) return beforeAt;
+  return beforeAt || jid;
+}
+
+function getDisplayNameForContact(name: string | null | undefined, remoteJid: string | null | undefined): string {
+  const n = (name ?? "").trim();
+  const jid = (remoteJid ?? "").trim();
+  const fallback = displayNameFromRemoteJid(remoteJid);
+  if (!n) return fallback || jid || "";
+  const isLid = jid.endsWith("@lid");
+  const onlyDigits = /^\d+$/.test(n);
+  if (isLid && onlyDigits) return fallback || jid || "";
+  if (isLid && n === jid.replace(/@.*$/, "")) return fallback || jid || "";
+  return n;
+}
+
 function mapConversationListItemToConversation(item: ConversationListItem): Conversation {
-  const contactName = item.contact?.name ?? item.contact?.remote_jid ?? "Contato";
+  const contactName = getDisplayNameForContact(item.contact?.name, item.contact?.remote_jid) || item.contact?.remote_jid || displayNameFromRemoteJid(item.contact?.remote_jid) || "";
   return {
     id: item.id,
     contact: {
@@ -77,6 +107,12 @@ function mapMessageListItemToMessage(msg: MessageListItem): Message {
   const senderName = msg.participant_remote_jid
     ? formatJidAsPhone(msg.participant_remote_jid)
     : undefined;
+  const msgType = (msg.message_type ?? "").toLowerCase();
+  let type: "text" | "image" | "audio" | "video" | "document" | undefined;
+  if (msgType.includes("audio")) type = "audio";
+  else if (msgType.includes("image") || msgType === "sticker") type = "image";
+  else if (msgType.includes("video")) type = "video";
+  else if (msgType.includes("document")) type = "document";
   return {
     id: msg.id,
     content: msg.content,
@@ -84,6 +120,10 @@ function mapMessageListItemToMessage(msg: MessageListItem): Message {
     isFromContact: msg.direction === "incoming",
     status: msg.status === "failed" ? "failed" : msg.status === "sent" ? "sent" : "delivered",
     senderName,
+    type,
+    mediaUrl: msg.media_url ?? undefined,
+    durationSeconds: msg.duration_seconds ?? undefined,
+    waveform: msg.waveform ?? undefined,
   };
 }
 
@@ -101,8 +141,6 @@ export default function ChatPage() {
   const [olderMessages, setOlderMessages] = useState<MessageListItem[]>([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const autoSyncInboxesRef = useRef<Set<string>>(new Set());
-  const [isAutoSyncing, setIsAutoSyncing] = useState(false);
 
   const { session } = useAuth();
   const { organizationId } = useTenant();
@@ -117,7 +155,9 @@ export default function ChatPage() {
   }, [channelFromUrl, selectedChannelId, channels]);
 
   const inboxIdForConversations =
-    selectedChannelId && selectedChannelId !== "all" ? selectedChannelId : null;
+    selectedChannelId && selectedChannelId !== "all"
+      ? selectedChannelId
+      : channels[0]?.id ?? null;
   const {
     conversations: conversationsRaw,
     isLoading: conversationsLoading,
@@ -131,41 +171,9 @@ export default function ChatPage() {
   });
   const conversations: Conversation[] = conversationsRaw.map(mapConversationListItemToConversation);
 
-  useEffect(() => {
-    if (!session?.access_token) return;
-    if (!inboxIdForConversations) return;
-    if (autoSyncInboxesRef.current.has(inboxIdForConversations)) return;
-    if (conversationsLoading) return;
-    if (conversations.length > 0) return;
+  const { options: inboxLabelOptions, labelMap } = useInboxLabels(inboxIdForConversations);
 
-    autoSyncInboxesRef.current.add(inboxIdForConversations);
-    setIsAutoSyncing(true);
-    syncInbox(inboxIdForConversations, session.access_token, { import_messages_days: 7 })
-      .then((result) => {
-        invalidateConversations();
-        invalidateChannels();
-        if (process.env.NODE_ENV !== "production") {
-          console.log("[ChatPage] Sync concluído:", {
-            conversations_created: result.conversations_created,
-            contacts_created: result.contacts_created,
-            messages_inserted: result.messages_inserted,
-          });
-        }
-      })
-      .catch((error) => {
-        console.error("[ChatPage] Auto sync inbox failed:", error);
-      })
-      .finally(() => {
-        setIsAutoSyncing(false);
-      });
-  }, [
-    session?.access_token,
-    inboxIdForConversations,
-    conversations.length,
-    conversationsLoading,
-    invalidateConversations,
-    invalidateChannels,
-  ]);
+  // Dados (conversas, contatos, etiquetas) vêm via webhook da Evolution; não há sync manual.
 
   const handleUpdateConversationLabels = useCallback(
     async (conversationId: string, labels: string[]) => {
@@ -181,7 +189,7 @@ export default function ChatPage() {
     [session?.access_token, queryClient, inboxIdForConversations]
   );
 
-  const { messages: messagesRaw, isLoading: messagesLoading, cursor, hasMore } = useMessages(
+  const { messages: messagesRaw, isLoading: messagesLoading, cursor, hasMore, invalidate: invalidateMessages } = useMessages(
     selectedConversationId ?? null
   );
 
@@ -435,11 +443,6 @@ export default function ChatPage() {
       <div className="h-full flex-1 flex bg-background overflow-hidden min-h-0">
         {isConversationsColumnOpen && (
           <div className="flex flex-col border-r border-border/50 w-[360px] max-w-full">
-            {isAutoSyncing && (
-              <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border/40">
-                Sincronizando conversas do canal selecionado...
-              </div>
-            )}
             <ConversationListPanel
               conversations={conversations}
               selectedConversationId={selectedConversationId}
@@ -454,6 +457,8 @@ export default function ChatPage() {
               listView={listView}
               onListViewChange={setListView}
               onUpdateConversationLabels={handleUpdateConversationLabels}
+              inboxLabelOptions={inboxLabelOptions}
+              labelMap={labelMap}
             />
           </div>
         )}
@@ -477,11 +482,16 @@ export default function ChatPage() {
         {isContactPanelOpen && selectedContact && (
           <ContactPanel
             contact={selectedContact}
+            conversationId={selectedConversationId ?? undefined}
+            accessToken={session?.access_token ?? undefined}
+            inboxLabelOptions={inboxLabelOptions}
             notes={notes}
             proposals={proposals}
             scheduledMessages={scheduledMessages}
             reminders={reminders}
             onClose={() => setIsContactPanelOpen(false)}
+            onRefreshContact={invalidateConversations}
+            onImportHistory={invalidateMessages}
             onAddNote={handleAddNote}
             onEditNote={handleEditNote}
             onDeleteNote={handleDeleteNote}

@@ -29,7 +29,7 @@ export function normalizeQrCode(data: { qrCode?: string | null; qrcode?: { base6
   return raw.startsWith("data:") ? raw : `data:image/png;base64,${raw}`;
 }
 
-function getAuthHeaders(accessToken: string): HeadersInit {
+export function getAuthHeaders(accessToken: string): HeadersInit {
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${accessToken}`,
@@ -69,9 +69,9 @@ export async function listContacts(
   const searchParams = new URLSearchParams();
   if (params?.limit != null) searchParams.set("limit", String(params.limit));
   if (params?.before) searchParams.set("before", params.before);
+  if (params?.search) searchParams.set("search", params.search);
   const query = searchParams.toString();
-  // Trailing slash para evitar 404 intermitente no proxy (ex.: /contacts vs /contacts/)
-  const url = `${CHANNELS_API_URL}/inboxes/${inboxId}/contacts/${query ? `?${query}` : ""}`;
+  const url = `${CHANNELS_API_URL}/inboxes/${inboxId}/contacts${query ? `?${query}` : ""}`;
   const res = await fetch(url, {
     method: "GET",
     headers: getAuthHeaders(accessToken),
@@ -183,6 +183,121 @@ export async function updateConversation(
     throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
   }
   return data as ConversationListItem;
+}
+
+/** Resposta do perfil comercial (WhatsApp Business) – descrição, horário, site, etc. */
+export type BusinessProfileResponse = {
+  businessProfile: {
+    description?: string;
+    website?: string[];
+    email?: string;
+    address?: string;
+    businessHours?: Record<string, { mode: string; hours?: Array<{ open: string; close: string }> }>;
+    [key: string]: unknown;
+  } | null;
+  /** true quando a Evolution falhou e os dados vieram do cache (Supabase). */
+  fromCache?: boolean;
+  /** Data da última busca bem-sucedida (ISO). */
+  fetchedAt?: string | null;
+};
+
+export async function getContactBusinessProfile(
+  conversationId: string,
+  accessToken: string
+): Promise<BusinessProfileResponse> {
+  const res = await fetch(
+    `${CHANNELS_API_URL}/conversations/${conversationId}/contact/business-profile`,
+    { method: "GET", headers: getAuthHeaders(accessToken) }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+  }
+  return data as BusinessProfileResponse;
+}
+
+/** Contato retornado pelo refresh de perfil. */
+export type RefreshContactProfileResponse = {
+  contact: {
+    id: string;
+    name: string | null;
+    remote_jid: string;
+    contact_type: string;
+    avatar_url: string | null;
+  };
+};
+
+export async function refreshContactProfile(
+  conversationId: string,
+  accessToken: string
+): Promise<RefreshContactProfileResponse> {
+  const res = await fetch(
+    `${CHANNELS_API_URL}/conversations/${conversationId}/contact/refresh`,
+    { method: "POST", headers: getAuthHeaders(accessToken) }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+  }
+  return data as RefreshContactProfileResponse;
+}
+
+/** Resposta da importação de histórico (Evolution → chat_messages). */
+export type ImportConversationHistoryResponse = {
+  imported: number;
+  total: number;
+};
+
+export async function importConversationHistory(
+  conversationId: string,
+  accessToken: string,
+  options?: { limit?: number }
+): Promise<ImportConversationHistoryResponse> {
+  const res = await fetch(
+    `${CHANNELS_API_URL}/conversations/${conversationId}/messages/import`,
+    {
+      method: "POST",
+      headers: getAuthHeaders(accessToken),
+      body: JSON.stringify({ limit: options?.limit ?? 100 }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+  }
+  return data as ImportConversationHistoryResponse;
+}
+
+/** Body para config de importação pós-conexão (estilo Chatwoot). */
+export type UpdateChannelImportConfigBody = {
+  import_contacts_on_connect?: boolean;
+  import_messages_on_connect?: boolean;
+  import_messages_days?: number; // 0–30
+};
+
+export type UpdateChannelImportConfigResponse = {
+  id: string;
+  import_contacts_on_connect: boolean;
+  import_messages_on_connect: boolean;
+  import_messages_days: number;
+  updated_at: string;
+};
+
+export async function updateChannelImportConfig(
+  channelId: string,
+  accessToken: string,
+  body: UpdateChannelImportConfigBody
+): Promise<UpdateChannelImportConfigResponse> {
+  const res = await fetch(`${CHANNELS_API_URL}/channels/${channelId}`, {
+    method: "PATCH",
+    headers: getAuthHeaders(accessToken),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+  }
+  return data as UpdateChannelImportConfigResponse;
 }
 
 export { CHANNELS_API_URL };

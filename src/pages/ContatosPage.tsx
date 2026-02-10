@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ function mapInboxToChannel(inbox: {
   channel_type: string;
   connection_status: string;
   whatsapp_phone_number?: string | null;
+  whatsapp_profile_name?: string | null;
+  whatsapp_profile_pic_url?: string | null;
 }): Channel {
   const status =
     inbox.connection_status === "connected"
@@ -26,9 +28,14 @@ function mapInboxToChannel(inbox: {
       : inbox.connection_status === "pending"
         ? "connecting"
         : "disconnected";
+  const isConnected = status === "connected";
+  const displayName =
+    isConnected && inbox.whatsapp_profile_name?.trim()
+      ? inbox.whatsapp_profile_name.trim()
+      : inbox.name;
   return {
     id: inbox.id,
-    name: inbox.name,
+    name: displayName,
     type: (inbox.channel_type as Channel["type"]) || "whatsapp",
     phoneNumber: inbox.whatsapp_phone_number ?? undefined,
     unreadCount: 0,
@@ -87,7 +94,14 @@ export default function ContatosPage() {
     channelFromUrl || "all"
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Debounce busca para evitar requisições a cada tecla (busca server-side)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const { channels: inboxes } = useChannels();
   const channels: Channel[] = inboxes.map(mapInboxToChannel);
@@ -100,16 +114,10 @@ export default function ContatosPage() {
     hasMore,
     loadMore,
     isLoadingMore,
-  } = useContacts(inboxIdForContacts);
+  } = useContacts(inboxIdForContacts, { search: debouncedSearch || undefined });
 
-  const filteredContacts = searchQuery
-    ? contacts.filter((c) => {
-        const q = searchQuery.toLowerCase();
-        const name = (c.name || "").toLowerCase();
-        const jid = (c.remote_jid || "").toLowerCase();
-        return name.includes(q) || jid.includes(q);
-      })
-    : contacts;
+  // Lista já vem filtrada pela API quando há busca
+  const displayContacts = contacts;
 
   const selectedChannel = channels.find((c) => c.id === selectedChannelId);
 
@@ -160,10 +168,10 @@ export default function ContatosPage() {
               <div className="flex-1 flex items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
-            ) : filteredContacts.length === 0 ? (
+            ) : displayContacts.length === 0 ? (
               <div className="flex-1 flex items-center justify-center text-muted-foreground">
                 <p>
-                  {searchQuery
+                  {debouncedSearch
                     ? "Nenhum contato encontrado para essa busca."
                     : "Nenhum contato neste canal. Use Sincronizar no canal para importar contatos."}
                 </p>
@@ -173,9 +181,10 @@ export default function ContatosPage() {
                 <ScrollArea className="flex-1">
                   <div className="px-2">
                     <p className="text-xs text-muted-foreground py-2 px-1">
-                      {filteredContacts.length} contato{filteredContacts.length !== 1 ? "s" : ""}
+                      {displayContacts.length} contato{displayContacts.length !== 1 ? "s" : ""}
+                      {hasMore ? " (há mais)" : ""}
                     </p>
-                    {filteredContacts.map((contact) => (
+                    {displayContacts.map((contact) => (
                       <ContactRow key={contact.id} contact={contact} />
                     ))}
                   </div>

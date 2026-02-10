@@ -51,6 +51,7 @@ export type ContactListItem = {
 export type ListContactsParams = {
   limit?: number;
   before?: string; // cursor: updated_at ISO
+  search?: string; // busca em nome e remote_jid (API consulta todo o banco)
 };
 
 export type ListContactsResponse = {
@@ -74,6 +75,12 @@ export type MessageListItem = {
   created_at: string;
   evolution_message_id: string | null;
   participant_remote_jid?: string | null; // em grupos: JID de quem enviou
+  /** URL do áudio (Evolution/backend preenche a partir de mediaUrl do events.upsert) */
+  media_url?: string | null;
+  /** Duração em segundos (ex.: audioMessage.seconds) */
+  duration_seconds?: number | null;
+  /** Waveform em base64 (WhatsApp PTT) para desenhar as barras */
+  waveform?: string | null;
 };
 
 export type ListMessagesResponse = {

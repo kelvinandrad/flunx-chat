@@ -28,9 +28,11 @@ interface ConversationItemProps {
   conversation: Conversation;
   isSelected: boolean;
   onClick: () => void;
+  /** Mapa id (evolution_label_id) -> { name, colorClass } para exibir etiquetas. */
+  labelMap?: Record<string, { name: string; colorClass: string }>;
 }
 
-export function ConversationItem({ conversation, isSelected, onClick }: ConversationItemProps) {
+export function ConversationItem({ conversation, isSelected, onClick, labelMap = {} }: ConversationItemProps) {
   const { contact, lastMessage, unreadCount, isTyping, isOnline, labels } = conversation;
   const isGroup = contact.contactType === "group";
 
@@ -132,11 +134,17 @@ export function ConversationItem({ conversation, isSelected, onClick }: Conversa
         {/* Labels */}
         {labels && labels.length > 0 && (
           <div className="flex gap-1 mt-1.5 flex-wrap">
-            {labels.slice(0, 2).map((label) => (
-              <Badge key={label} variant="outline" className="text-xs py-0 h-5">
-                {label}
-              </Badge>
-            ))}
+            {labels.slice(0, 2).map((labelId) => {
+              const info = labelMap[labelId];
+              const name = info?.name ?? labelId;
+              const colorClass = info?.colorClass ?? "bg-gray-400";
+              return (
+                <Badge key={labelId} variant="outline" className="text-xs py-0 h-5 flex items-center gap-1">
+                  <span className={cn("h-1.5 w-1.5 rounded-full flex-shrink-0", colorClass)} />
+                  {name}
+                </Badge>
+              );
+            })}
             {labels.length > 2 && (
               <Badge variant="outline" className="text-xs py-0 h-5">
                 +{labels.length - 2}

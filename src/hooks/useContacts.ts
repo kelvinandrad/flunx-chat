@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,13 +7,17 @@ import type { ListContactsResponse } from "@/lib/chat-api-types";
 
 const DEFAULT_LIMIT = 50;
 
-export function useContacts(inboxId: string | null | undefined) {
+export function useContacts(
+  inboxId: string | null | undefined,
+  options?: { search?: string }
+) {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const token = session?.access_token ?? null;
+  const search = options?.search?.trim() || undefined;
 
   const query = useInfiniteQuery({
-    queryKey: ["chat_contacts", inboxId],
+    queryKey: ["chat_contacts", inboxId, search ?? ""],
     queryFn: async ({
       pageParam,
     }: {
@@ -22,6 +27,7 @@ export function useContacts(inboxId: string | null | undefined) {
       return listContacts(inboxId, token, {
         limit: DEFAULT_LIMIT,
         before: pageParam ?? undefined,
+        search: search ?? undefined,
       });
     },
     getNextPageParam: (lastPage) => (lastPage.has_more ? lastPage.cursor : undefined),
@@ -30,7 +36,42 @@ export function useContacts(inboxId: string | null | undefined) {
   });
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["chat_contacts", inboxId] });
+    queryClient.invalidateQueries({
+      predicate: (q) =>
+        Array.isArray(q.queryKey) &&
+        q.queryKey[0] === "chat_contacts" &&
+        q.queryKey[1] === inboxId,
+    });
+
+  // Realtime: contatos do inbox (novos/atualizações)
+  useEffect(() => {
+    if (!inboxId) return;
+
+    const channel = supabase
+      .channel(`chat_contacts_${inboxId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_contacts",
+          filter: `inbox_id=eq.${inboxId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({
+            predicate: (q) =>
+              Array.isArray(q.queryKey) &&
+              q.queryKey[0] === "chat_contacts" &&
+              q.queryKey[1] === inboxId,
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [inboxId, queryClient]);
 
   const contacts = (query.data?.pages ?? []).flatMap((p) => p.contacts);
   const hasMore = query.hasNextPage ?? false;

@@ -9,7 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, MessageCircle, Mail, Send, Instagram, Facebook, MessageSquare } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizeQrCode, QR_CODE_VALIDITY_MS } from "@/lib/chat-api";
 import { useTenant } from "@/contexts/TenantContext";
@@ -20,7 +20,17 @@ import { QRCodeTimer } from "@/components/QRCodeTimer";
 const CHANNELS_API_URL =
   import.meta.env.VITE_EVOLUTION_API_URL || import.meta.env.VITE_CHANNELS_API_URL || "http://localhost:3001";
 
-type Step = "form" | "loading" | "qrcode" | "done" | "error";
+type Step = "type" | "form" | "loading" | "qrcode" | "done" | "error";
+
+const CHANNEL_TYPES = [
+  { id: "whatsapp_non_official", label: "WhatsApp (não-oficial)", desc: "Conexão via Evolution API", icon: WhatsAppIcon, active: true },
+  { id: "whatsapp_official", label: "WhatsApp API Oficial", desc: "Em breve", icon: MessageCircle, active: false },
+  { id: "email", label: "Email", desc: "Em breve", icon: Mail, active: false },
+  { id: "telegram", label: "Telegram", desc: "Em breve", icon: Send, active: false },
+  { id: "instagram", label: "Instagram", desc: "Em breve", icon: Instagram, active: false },
+  { id: "messenger", label: "Messenger", desc: "Em breve", icon: Facebook, active: false },
+  { id: "sms", label: "SMS", desc: "Em breve", icon: MessageSquare, active: false },
+] as const;
 
 interface CreateChannelDialogProps {
   open: boolean;
@@ -32,7 +42,8 @@ interface CreateChannelDialogProps {
 export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateChannelDialogProps) {
   const { session } = useAuth();
   const { organizationId } = useTenant();
-  const [step, setStep] = useState<Step>("form");
+  const [step, setStep] = useState<Step>("type");
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -103,7 +114,8 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
   }, [step, inboxId]);
 
   const reset = () => {
-    setStep("form");
+    setStep("type");
+    setSelectedType(null);
     setName("");
     setErrorMessage("");
     setQrCode(null);
@@ -119,7 +131,7 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!organizationId || !name.trim()) return;
+    if (!organizationId || !name.trim() || !selectedType) return;
 
     setStep("loading");
     setErrorMessage("");
@@ -133,7 +145,7 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
-          type: "whatsapp_non_official",
+          type: selectedType,
           name: name.trim(),
           organization_id: organizationId,
         }),
@@ -142,7 +154,14 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErrorMessage(data?.error || data?.detail || `Erro ${res.status}`);
+        const status = res.status;
+        let msg = data?.error || data?.detail;
+        if (!msg) {
+          if (status === 502 || status === 503) msg = `Serviço temporariamente indisponível (${status}). Tente novamente em instantes.`;
+          else if (status === 401) msg = "Sessão expirada. Faça login novamente.";
+          else msg = `Erro ${status}`;
+        }
+        setErrorMessage(msg);
         setStep("error");
         return;
       }
@@ -187,13 +206,15 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
       <DialogContent className="sm:max-w-md rounded-2xl border-border/80 bg-card shadow-xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-semibold">
-            {step === "form" && "Conectar canal"}
+            {step === "type" && "Conectar canal"}
+            {step === "form" && "Nome do canal"}
             {step === "loading" && "Criando canal..."}
             {step === "qrcode" && "Escaneie o QR Code"}
             {step === "done" && "Canal conectado"}
             {step === "error" && "Erro ao conectar"}
           </DialogTitle>
           <DialogDescription>
+            {step === "type" && "Escolha o tipo de canal que deseja conectar."}
             {step === "form" && "WhatsApp não-oficial via Evolution API. Dê um nome ao canal."}
             {step === "loading" && "Estamos criando a instância e gerando o QR code."}
             {step === "qrcode" && "Abra o WhatsApp no celular e escaneie para vincular."}
@@ -201,6 +222,37 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
             {step === "error" && errorMessage}
           </DialogDescription>
         </DialogHeader>
+
+        {step === "type" && (
+          <div className="space-y-2 pt-2 max-h-[60vh] overflow-y-auto">
+            {CHANNEL_TYPES.map(({ id, label, desc, icon: Icon, active }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => { if (active) { setSelectedType(id); setStep("form"); } }}
+                disabled={!active}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
+                  active
+                    ? "border-border/50 bg-muted/50 hover:bg-muted hover:border-primary/30 cursor-pointer"
+                    : "border-border/30 bg-muted/20 opacity-70 cursor-not-allowed"
+                }`}
+              >
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${active ? "bg-emerald-500/15" : "bg-muted"}`}>
+                  <Icon className={`h-5 w-5 ${active ? "text-emerald-500" : "text-muted-foreground"}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground">{label}</p>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
+                </div>
+              </button>
+            ))}
+            <div className="flex gap-2 pt-2">
+              <Button type="button" variant="outline" className="flex-1 rounded-lg" onClick={() => handleClose(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
 
         {step === "form" && (
           <form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -225,8 +277,8 @@ export function CreateChannelDialog({ open, onOpenChange, onSuccess }: CreateCha
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <Button type="button" variant="outline" className="flex-1 rounded-lg" onClick={() => handleClose(false)}>
-                Cancelar
+              <Button type="button" variant="outline" className="flex-1 rounded-lg" onClick={() => setStep("type")}>
+                Voltar
               </Button>
               <Button type="submit" className="flex-1 rounded-lg gap-2" disabled={!name.trim()}>
                 Criar e gerar QR

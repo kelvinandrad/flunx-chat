@@ -24,6 +24,10 @@ export type ChatInbox = {
   whatsapp_jid: string | null;
   contacts_count: number;
   conversations_count: number;
+  // Importação pós-conexão (estilo Chatwoot)
+  import_contacts_on_connect?: boolean;
+  import_messages_on_connect?: boolean;
+  import_messages_days?: number;
   created_at: string;
   updated_at: string;
 };

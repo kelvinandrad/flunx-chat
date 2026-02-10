@@ -20,6 +20,7 @@ import {
 import { Search, Filter, X, ChevronDown, Check, Loader2, Tag } from "lucide-react";
 import { ConversationItem, Conversation } from "./ConversationItem";
 import { WhatsAppIcon } from "@/components/icons/WhatsAppIcon";
+import type { InboxLabelOption } from "@/hooks/useInboxLabels";
 import { cn } from "@/lib/utils";
 
 export interface Channel {
@@ -48,6 +49,10 @@ interface ConversationListPanelProps {
   listView?: ListViewMode;
   onListViewChange?: (view: ListViewMode) => void;
   onUpdateConversationLabels?: (conversationId: string, labels: string[]) => Promise<void>;
+  /** Etiquetas do canal (chat_inbox_labels); usado em filtros e edição de etiquetas da conversa. */
+  inboxLabelOptions?: InboxLabelOption[];
+  /** Mapa id (evolution_label_id) -> { name, colorClass } para exibir nomes/cores nos itens. */
+  labelMap?: Record<string, { name: string; colorClass: string }>;
 }
 
 type FilterTab = "all" | "unread" | "open" | "pending" | "resolved";
@@ -58,14 +63,6 @@ const FILTER_TABS: { value: FilterTab; label: string }[] = [
   { value: "open", label: "Abertas" },
   { value: "pending", label: "Pendentes" },
   { value: "resolved", label: "Resolvidas" },
-];
-
-const LABELS = [
-  { id: "lead-quente", name: "Lead quente", color: "bg-red-500" },
-  { id: "proposta-enviada", name: "Proposta enviada", color: "bg-orange-500" },
-  { id: "follow-up", name: "Follow-up", color: "bg-yellow-500" },
-  { id: "cliente", name: "Cliente", color: "bg-green-500" },
-  { id: "suporte", name: "Suporte", color: "bg-blue-500" },
 ];
 
 export function ConversationListPanel({
@@ -82,6 +79,8 @@ export function ConversationListPanel({
   listView = "all",
   onListViewChange,
   onUpdateConversationLabels,
+  inboxLabelOptions = [],
+  labelMap = {},
 }: ConversationListPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
@@ -346,25 +345,29 @@ export function ConversationListPanel({
                 </p>
               </div>
               <div className="p-3 space-y-1 max-h-48 overflow-y-auto">
-                {LABELS.map((label) => (
-                  <button
-                    key={label.id}
-                    type="button"
-                    onClick={() => toggleLabelsEditDraft(label.id)}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-                      labelsEditDraft.includes(label.id)
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-muted"
-                    )}
-                  >
-                    <span className={cn("h-2 w-2 rounded-full flex-shrink-0", label.color)} />
-                    <span className="flex-1 text-left">{label.name}</span>
-                    {labelsEditDraft.includes(label.id) && (
-                      <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                    )}
-                  </button>
-                ))}
+                {inboxLabelOptions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2">Nenhuma etiqueta no canal. Conecte o WhatsApp para sincronizar.</p>
+                ) : (
+                  inboxLabelOptions.map((label) => (
+                    <button
+                      key={label.id}
+                      type="button"
+                      onClick={() => toggleLabelsEditDraft(label.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                        labelsEditDraft.includes(label.id)
+                          ? "bg-primary/10 text-primary"
+                          : "hover:bg-muted"
+                      )}
+                    >
+                      <span className={cn("h-2 w-2 rounded-full flex-shrink-0", label.colorClass)} />
+                      <span className="flex-1 text-left">{label.name}</span>
+                      {labelsEditDraft.includes(label.id) && (
+                        <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                      )}
+                    </button>
+                  ))
+                )}
               </div>
               <div className="p-3 flex justify-end gap-2 border-t border-border">
                 <Button
@@ -464,24 +467,28 @@ export function ConversationListPanel({
               <div className="p-3 border-b border-border">
                 <p className="text-xs font-medium text-muted-foreground mb-2">Etiquetas</p>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {LABELS.map((label) => (
-                    <button
-                      key={label.id}
-                      onClick={() => toggleDraftLabel(label.id)}
-                      className={cn(
-                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
-                        draftLabels.includes(label.id)
-                          ? "bg-primary/10 text-primary"
-                          : "hover:bg-muted"
-                      )}
-                    >
-                      <span className={cn("h-2 w-2 rounded-full flex-shrink-0", label.color)} />
-                      <span className="flex-1 text-left">{label.name}</span>
-                      {draftLabels.includes(label.id) && (
-                        <Check className="h-4 w-4 text-primary flex-shrink-0" />
-                      )}
-                    </button>
-                  ))}
+                  {inboxLabelOptions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-1">Nenhuma etiqueta no canal.</p>
+                  ) : (
+                    inboxLabelOptions.map((label) => (
+                      <button
+                        key={label.id}
+                        onClick={() => toggleDraftLabel(label.id)}
+                        className={cn(
+                          "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors",
+                          draftLabels.includes(label.id)
+                            ? "bg-primary/10 text-primary"
+                            : "hover:bg-muted"
+                        )}
+                      >
+                        <span className={cn("h-2 w-2 rounded-full flex-shrink-0", label.colorClass)} />
+                        <span className="flex-1 text-left">{label.name}</span>
+                        {draftLabels.includes(label.id) && (
+                          <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                        )}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -544,6 +551,7 @@ export function ConversationListPanel({
                 conversation={conversation}
                 isSelected={selectedConversationId === conversation.id}
                 onClick={() => onSelectConversation(conversation.id)}
+                labelMap={labelMap}
               />
             ))}
             {hasMoreConversations && onLoadMoreConversations && (

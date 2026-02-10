@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Check, CheckCheck, Clock } from "lucide-react";
+import { AudioPlayer } from "./AudioPlayer";
 
 export interface Message {
   id: string;
@@ -9,6 +10,10 @@ export interface Message {
   status?: "sending" | "sent" | "delivered" | "read" | "failed";
   type?: "text" | "image" | "audio" | "video" | "document";
   mediaUrl?: string;
+  /** Duração do áudio em segundos */
+  durationSeconds?: number;
+  /** Waveform em base64 (WhatsApp) para barras do player */
+  waveform?: string;
   /** Em grupos: nome/número de quem enviou (quando isFromContact) */
   senderName?: string;
   replyTo?: {
@@ -25,8 +30,8 @@ interface MessageBubbleProps {
   contactAvatar?: string;
 }
 
-export function MessageBubble({ message, showAvatar, contactName }: MessageBubbleProps) {
-  const { content, timestamp, isFromContact, status, replyTo, senderName } = message;
+export function MessageBubble({ message, showAvatar, contactName, contactAvatar }: MessageBubbleProps) {
+  const { content, timestamp, isFromContact, status, replyTo, senderName, type, mediaUrl, durationSeconds, waveform } = message;
 
   const formatTime = (ts: string) => {
     return new Date(ts).toLocaleTimeString("pt-BR", {
@@ -87,8 +92,65 @@ export function MessageBubble({ message, showAvatar, contactName }: MessageBubbl
           <p className="text-xs font-medium text-muted-foreground mb-1">{senderName}</p>
         )}
 
-        {/* Message content */}
-        <p className="text-sm whitespace-pre-wrap break-words">{content}</p>
+        {/* Imagem */}
+        {type === "image" && mediaUrl && (
+          <div className="space-y-1">
+            <img
+              src={mediaUrl}
+              alt=""
+              className="max-w-full max-h-64 rounded object-contain"
+            />
+            {content && content !== "[Mídia]" && (
+              <p className="text-sm whitespace-pre-wrap break-words">{content}</p>
+            )}
+          </div>
+        )}
+
+        {/* Vídeo */}
+        {type === "video" && mediaUrl && (
+          <div className="space-y-1">
+            <video
+              src={mediaUrl}
+              controls
+              className="max-w-full max-h-64 rounded"
+            />
+            {content && content !== "[Mídia]" && (
+              <p className="text-sm whitespace-pre-wrap break-words">{content}</p>
+            )}
+          </div>
+        )}
+
+        {/* Documento: link para abrir */}
+        {type === "document" && mediaUrl && (
+          <div className="space-y-1">
+            <a
+              href={mediaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm underline break-all"
+            >
+              {content && content !== "[Mídia]" ? content : "Abrir arquivo"}
+            </a>
+          </div>
+        )}
+
+        {/* Áudio: player estilo WhatsApp */}
+        {type === "audio" && mediaUrl ? (
+          <AudioPlayer
+            messageId={message.id}
+            mediaUrl={mediaUrl}
+            durationSeconds={durationSeconds}
+            waveformBase64={waveform}
+            isFromContact={isFromContact}
+            contactAvatar={contactAvatar}
+            contactName={contactName}
+          />
+        ) : null}
+
+        {/* Texto (quando não é mídia ou quando não tem mediaUrl) */}
+        {type !== "image" && type !== "video" && type !== "document" && (type !== "audio" || !mediaUrl) && (
+          <p className="text-sm whitespace-pre-wrap break-words">{content}</p>
+        )}
 
         {/* Timestamp and status */}
         <div

@@ -25,6 +25,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
+import type { InboxLabelOption } from "@/hooks/useInboxLabels";
 import { cn } from "@/lib/utils";
 
 interface ContactInfo {
@@ -43,19 +44,11 @@ interface ContactInfo {
 interface ContactInfoTabProps {
   contact: ContactInfo;
   onUpdate?: (updates: Partial<ContactInfo>) => void;
+  /** Etiquetas do canal (chat_inbox_labels). */
+  inboxLabelOptions?: InboxLabelOption[];
 }
 
-const AVAILABLE_LABELS = [
-  { id: "lead-quente", name: "Lead quente", color: "bg-red-500" },
-  { id: "proposta-enviada", name: "Proposta enviada", color: "bg-orange-500" },
-  { id: "follow-up", name: "Follow-up", color: "bg-yellow-500" },
-  { id: "cliente", name: "Cliente", color: "bg-green-500" },
-  { id: "suporte", name: "Suporte", color: "bg-blue-500" },
-  { id: "vip", name: "VIP", color: "bg-purple-500" },
-  { id: "novo", name: "Novo", color: "bg-cyan-500" },
-];
-
-export function ContactInfoTab({ contact, onUpdate }: ContactInfoTabProps) {
+export function ContactInfoTab({ contact, onUpdate, inboxLabelOptions = [] }: ContactInfoTabProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedContact, setEditedContact] = useState(contact);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -202,25 +195,29 @@ export function ContactInfoTab({ contact, onUpdate }: ContactInfoTabProps) {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {AVAILABLE_LABELS.map((label) => {
-            const isSelected = contact.labels?.includes(label.id);
-            return (
-              <button
-                key={label.id}
-                onClick={() => handleLabelToggle(label.id)}
-                className={cn(
-                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
-                  isSelected
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                )}
-              >
-                <span className={cn("h-2 w-2 rounded-full", label.color)} />
-                {label.name}
-                {isSelected && <X className="h-3 w-3 ml-0.5" />}
-              </button>
-            );
-          })}
+          {inboxLabelOptions.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Nenhuma etiqueta no canal.</p>
+          ) : (
+            inboxLabelOptions.map((label) => {
+              const isSelected = contact.labels?.includes(label.id);
+              return (
+                <button
+                  key={label.id}
+                  onClick={() => handleLabelToggle(label.id)}
+                  className={cn(
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors",
+                    isSelected
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  <span className={cn("h-2 w-2 rounded-full", label.colorClass)} />
+                  {label.name}
+                  {isSelected && <X className="h-3 w-3 ml-0.5" />}
+                </button>
+              );
+            })
+          )}
         </div>
       </div>
 

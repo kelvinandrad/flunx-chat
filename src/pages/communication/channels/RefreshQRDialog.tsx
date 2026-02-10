@@ -61,11 +61,12 @@ export function RefreshQRDialog({
   const forceRefreshConnection = async (id: string) => {
     if (!session?.access_token) return false;
     try {
-      const res = await fetch(`${CHANNELS_API_URL}/channels/${id}/info`, {
+      const res = await fetch(`${CHANNELS_API_URL}/channels/${id}/qrcode`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const data = await res.json().catch(() => ({}));
-      if (data?.connection_status === "connected") return true;
+      const connected = data?.connection_status === "connected" || data?.connectionStatus === "connected";
+      if (connected) return true;
     } catch (err) {
       console.warn("[RefreshQRDialog] refresh connection failed:", err);
     }
@@ -82,21 +83,25 @@ export function RefreshQRDialog({
     setQrStartTime(0);
 
     const token = session?.access_token;
-    fetch(`${CHANNELS_API_URL}/channels/${inboxId}/qrcode`, {
+    fetch(`${CHANNELS_API_URL}/channels/${inboxId}/qrcode/refresh`, {
+      method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((res) => res.json().catch(() => ({})))
       .then((data) => {
         setLoading(false);
-        if (data.connection_status === "connected") {
+        const connected = data.connection_status === "connected" || data.connectionStatus === "connected";
+        if (connected) {
           finishConnection();
           return;
         }
-        setQrCode(normalizeQrCode(data) ?? null);
-        if (normalizeQrCode(data)) {
-          setQrStartTime(Date.now());
+        const qr = normalizeQrCode(data) ?? null;
+        setQrCode(qr);
+        if (qr) {
+          const at = data?.qr_code_generated_at ? new Date(data.qr_code_generated_at).getTime() : Date.now();
+          setQrStartTime(at);
         }
-        if (!normalizeQrCode(data) && !data.connection_status) {
+        if (!qr && !connected) {
           setErrorMessage(data?.error || "Não foi possível obter o QR Code.");
         }
       })
