@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { listConversations } from "@/lib/chat-api";
 import type { ListConversationsResponse } from "@/lib/chat-api-types";
+import type { ConversationStatus } from "@/lib/chat-api-types";
 
 const DEFAULT_LIMIT = 30;
 const DEFAULT_DAYS = 7;
@@ -11,6 +12,8 @@ const DEFAULT_DAYS = 7;
 export type UseConversationsFilter = {
   includeArchived?: boolean;
   pinnedOnly?: boolean;
+  /** Filtro por status (estilo Chatwoot: open | pending | resolved). "all" ou undefined = não filtra no servidor. */
+  status?: ConversationStatus | "all";
 };
 
 export function useConversations(
@@ -22,9 +25,10 @@ export function useConversations(
   const token = session?.access_token ?? null;
   const includeArchived = filter?.includeArchived ?? false;
   const pinnedOnly = filter?.pinnedOnly ?? false;
+  const statusFilter = filter?.status && filter.status !== "all" ? filter.status : undefined;
 
   const query = useInfiniteQuery({
-    queryKey: ["chat_conversations", inboxId, includeArchived, pinnedOnly],
+    queryKey: ["chat_conversations", inboxId, includeArchived, pinnedOnly, statusFilter],
     queryFn: async ({
       pageParam,
     }: {
@@ -37,7 +41,8 @@ export function useConversations(
         before: pageParam ?? undefined,
         include_archived: includeArchived || undefined,
         pinned: pinnedOnly || undefined,
-        only_with_messages: true, // só conversas com mensagens (igual WhatsApp Web); contatos sem conversa não aparecem na lista
+        status: statusFilter,
+        only_with_messages: true, // só conversas com mensagens (igual WhatsApp Web)
       });
     },
     getNextPageParam: (lastPage) => (lastPage.has_more ? lastPage.cursor : undefined),
@@ -47,10 +52,11 @@ export function useConversations(
 
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: ["chat_conversations", inboxId, includeArchived, pinnedOnly],
+      queryKey: ["chat_conversations", inboxId, includeArchived, pinnedOnly, statusFilter],
     });
 
-  // Realtime: conversas do inbox (novas conversas ou updated_at quando chega mensagem)
+  // Realtime: invalida queries do inbox para a lista atualizar sem recarregar a página.
+  // Usamos invalidateQueries (não refetchQueries) para evitar muitas requisições simultâneas e ERR_INSUFFICIENT_RESOURCES.
   useEffect(() => {
     if (!inboxId) return;
 

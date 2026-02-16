@@ -100,9 +100,15 @@ export function ConversationItem({ conversation, isSelected, onClick, labelMap =
             {contact.name}
           </span>
           <span className={cn(
-            "text-xs flex-shrink-0",
+            "text-xs flex-shrink-0 flex items-center gap-1",
             unreadCount > 0 ? "text-primary font-medium" : "text-muted-foreground"
           )}>
+            {conversation.status === "resolved" && (
+              <span className="text-muted-foreground/80" title="Resolvida">•</span>
+            )}
+            {conversation.status === "pending" && (
+              <span className="text-amber-500/90" title="Pendente">•</span>
+            )}
             {formatTime(lastMessage.timestamp)}
           </span>
         </div>

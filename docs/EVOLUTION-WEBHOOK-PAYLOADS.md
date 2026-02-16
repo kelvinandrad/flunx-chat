@@ -103,10 +103,15 @@ ou `"data": { "id": "5562...", "pushName": "Maria" }`
 
 **Uso:** Remover conversa em `chat_conversations` (contato permanece).
 
+**Formato real da Evolution:** `data` é **array de JIDs** (strings), ex.: `data: [ '252609088778404@lid' ]`. A API aceita array ou objeto único.
+
 | Campo | Tipo | Onde | Descrição |
 |-------|------|------|-----------|
-| `data` | object | | Um objeto com JID do chat |
-| `data.id` / `data.remoteJid` / `data.jid` | string | | JID do chat removido |
+| `data` | array ou object | | Array de JIDs (strings) ou um objeto com id/remoteJid/jid |
+| `data[i]` (se array) | string | | JID do chat removido (ex.: `252609088778404@lid`) |
+| `data.id` / `data.remoteJid` / `data.jid` | string | (se data for objeto) | JID do chat removido |
+
+**Comparar logs:** Evolution loga `event: 'chats.delete'`, `data: [ '...@lid' ]`; API loga `[webhook] event=chats.delete` e `[webhook] CHATS_DELETE <instance> conversa removida jid: ...` (ou "contato não encontrado").
 
 ---
 

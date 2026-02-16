@@ -13,7 +13,7 @@ import { useInboxLabels } from "@/hooks/useInboxLabels";
 import { useMessages, useSendMessage } from "@/hooks/useMessages";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenant } from "@/contexts/TenantContext";
-import { listMessages, updateConversation } from "@/lib/chat-api";
+import { listMessages, updateConversation, createConversation } from "@/lib/chat-api";
 import type { ConversationListItem, MessageListItem } from "@/lib/chat-api-types";
 import {
   useContactNotes,
@@ -138,6 +138,8 @@ export default function ChatPage() {
   const [isContactPanelOpen, setIsContactPanelOpen] = useState(false);
   const [isConversationsColumnOpen, setIsConversationsColumnOpen] = useState(true);
   const [listView, setListView] = useState<"all" | "archived" | "pinned">("all");
+  /** Filtro por status (estilo Chatwoot: todas / não lidas / abertas / pendentes / resolvidas). Abertas/pendentes/resolvidas disparam filtro no servidor. */
+  const [conversationStatusTab, setConversationStatusTab] = useState<"all" | "unread" | "open" | "pending" | "resolved">("all");
   const [olderMessages, setOlderMessages] = useState<MessageListItem[]>([]);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -168,6 +170,10 @@ export default function ChatPage() {
   } = useConversations(inboxIdForConversations, {
     includeArchived: listView === "archived",
     pinnedOnly: listView === "pinned",
+    status:
+      conversationStatusTab === "open" || conversationStatusTab === "pending" || conversationStatusTab === "resolved"
+        ? conversationStatusTab
+        : undefined,
   });
   const conversations: Conversation[] = conversationsRaw.map(mapConversationListItemToConversation);
 
@@ -305,6 +311,34 @@ export default function ChatPage() {
   const handleRetry = useCallback(() => {
     setSendError(null);
   }, []);
+
+  const handleResolveConversation = useCallback(
+    async (conversationId: string) => {
+      if (!session?.access_token) return;
+      await updateConversation(conversationId, session.access_token, { status: "resolved" });
+      invalidateConversations();
+    },
+    [session?.access_token, invalidateConversations]
+  );
+
+  const handleReopenConversation = useCallback(
+    async (conversationId: string) => {
+      if (!session?.access_token) return;
+      await updateConversation(conversationId, session.access_token, { status: "open" });
+      invalidateConversations();
+    },
+    [session?.access_token, invalidateConversations]
+  );
+
+  const handleCreateConversation = useCallback(
+    async (inboxId: string, contactId: string) => {
+      if (!session?.access_token) return;
+      const created = await createConversation(inboxId, { contact_id: contactId }, session.access_token);
+      invalidateConversations();
+      setSelectedConversationId(created.id);
+    },
+    [session?.access_token, invalidateConversations]
+  );
 
   const handleAddNote = useCallback(
     async (content: string) => {
@@ -456,6 +490,8 @@ export default function ChatPage() {
               isLoadingMoreConversations={isLoadingMoreConversations}
               listView={listView}
               onListViewChange={setListView}
+              activeStatusTab={conversationStatusTab}
+              onStatusTabChange={setConversationStatusTab}
               onUpdateConversationLabels={handleUpdateConversationLabels}
               inboxLabelOptions={inboxLabelOptions}
               labelMap={labelMap}
@@ -465,12 +501,18 @@ export default function ChatPage() {
 
         <ChatArea
           contact={selectedContact}
+          conversationId={selectedConversationId}
+          conversationStatus={selectedConversation?.status}
+          inboxId={inboxIdForConversations}
           messages={selectedConversationId ? messages : []}
           onSendMessage={handleSendMessage}
           onToggleContactPanel={() => setIsContactPanelOpen(!isContactPanelOpen)}
           isContactPanelOpen={isContactPanelOpen}
           isConversationsColumnOpen={isConversationsColumnOpen}
           onToggleConversationsColumn={() => setIsConversationsColumnOpen((v) => !v)}
+          onResolveConversation={handleResolveConversation}
+          onReopenConversation={handleReopenConversation}
+          onCreateConversation={handleCreateConversation}
           isLoading={messagesLoading}
           hasMoreMessages={hasMore}
           onLoadMore={handleLoadOlder}

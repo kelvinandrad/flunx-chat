@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,9 @@ interface ConversationListPanelProps {
   inboxLabelOptions?: InboxLabelOption[];
   /** Mapa id (evolution_label_id) -> { name, colorClass } para exibir nomes/cores nos itens. */
   labelMap?: Record<string, { name: string; colorClass: string }>;
+  /** Tab de status (estilo Chatwoot). Quando definido, a lista é filtrada no servidor por status. */
+  activeStatusTab?: FilterTab;
+  onStatusTabChange?: (tab: FilterTab) => void;
 }
 
 type FilterTab = "all" | "unread" | "open" | "pending" | "resolved";
@@ -81,9 +84,19 @@ export function ConversationListPanel({
   onUpdateConversationLabels,
   inboxLabelOptions = [],
   labelMap = {},
+  activeStatusTab,
+  onStatusTabChange,
 }: ConversationListPanelProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<FilterTab>("all");
+  const [internalTab, setInternalTab] = useState<FilterTab>("all");
+  const activeTab = activeStatusTab ?? internalTab;
+  const setActiveTab = useCallback(
+    (tab: FilterTab) => {
+      if (onStatusTabChange) onStatusTabChange(tab);
+      else setInternalTab(tab);
+    },
+    [onStatusTabChange]
+  );
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
   const [filterPopoverOpen, setFilterPopoverOpen] = useState(false);
   const [labelsPopoverOpen, setLabelsPopoverOpen] = useState(false);

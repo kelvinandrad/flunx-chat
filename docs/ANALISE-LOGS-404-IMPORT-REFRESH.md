@@ -102,3 +102,10 @@ Ou seja: **a API está respondendo 200** e fazendo o fluxo. O que pode explicar 
 | messages/import | 200 OK        | Evolution retornou 0 mensagens ou todas já existiam no Supabase. |
 
 Para o próximo teste: após clicar de novo em “Importar histórico” e “Atualizar nome e foto”, conferir nos logs da API as linhas `[channels] importConversationHistory` e `[channels] refreshConversationContactProfile no new data` para ver `imported/total` e se o refresh recebeu dados da Evolution.
+
+
+---
+
+## 5. "Tem mais de uma mensagem" (conversa @lid)
+
+No chat com "Kelvin Andrade" há **várias mensagens** visíveis, mas o log mostrou `imported: 0 total: 1`. Conclusão: a Evolution está devolvendo só 1 mensagem para esse chat (remoteJid ...@lid). Para @lid a Evolution pode armazenar com outro identificador ou a única mensagem não tem key.id. Logs de diagnóstico foram adicionados na API (remoteJid + messages without key.id).

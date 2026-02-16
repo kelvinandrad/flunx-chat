@@ -14,6 +14,8 @@ import type {
   SendMessageBody,
   SendMessageResponse,
   UpdateConversationBody,
+  CreateConversationBody,
+  CreateConversationResponse,
 } from "./chat-api-types";
 
 const CHANNELS_API_URL =
@@ -48,6 +50,7 @@ export async function listConversations(
   if (params?.only_with_messages === false) searchParams.set("only_with_messages", "false");
   if (params?.include_archived === true) searchParams.set("include_archived", "true");
   if (params?.pinned === true) searchParams.set("pinned", "true");
+  if (params?.status) searchParams.set("status", params.status);
   const query = searchParams.toString();
   const url = `${CHANNELS_API_URL}/inboxes/${inboxId}/conversations${query ? `?${query}` : ""}`;
   const res = await fetch(url, {
@@ -183,6 +186,24 @@ export async function updateConversation(
     throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
   }
   return data as ConversationListItem;
+}
+
+/** Fase 3: cria nova conversa (nova thread) com o mesmo contato. Body: contact_inbox_id ou contact_id. */
+export async function createConversation(
+  inboxId: string,
+  body: CreateConversationBody,
+  accessToken: string
+): Promise<CreateConversationResponse> {
+  const res = await fetch(`${CHANNELS_API_URL}/inboxes/${inboxId}/conversations`, {
+    method: "POST",
+    headers: getAuthHeaders(accessToken),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.error || data?.detail || `Erro ${res.status}`);
+  }
+  return data as CreateConversationResponse;
 }
 
 /** Resposta do perfil comercial (WhatsApp Business) – descrição, horário, site, etc. */

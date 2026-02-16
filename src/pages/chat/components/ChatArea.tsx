@@ -24,10 +24,12 @@ import {
   Ban,
   Trash2,
   MessageSquare,
+  MessageCirclePlus,
+  CheckCircle,
+  RotateCcw,
   PanelLeftClose,
   PanelLeftOpen,
   Loader2,
-  RotateCcw,
 } from "lucide-react";
 import { MessageBubble, DateSeparator, Message } from "./MessageBubble";
 import { ChatInput } from "./ChatInput";
@@ -46,12 +48,19 @@ interface Contact {
 
 interface ChatAreaProps {
   contact: Contact | null;
+  conversationId: string | null;
+  /** Status da conversa atual: open | pending | resolved (Fase 3) */
+  conversationStatus?: string;
+  inboxId: string | null;
   messages: Message[];
   onSendMessage: (content: string) => void;
   onToggleContactPanel: () => void;
   isContactPanelOpen: boolean;
   isConversationsColumnOpen?: boolean;
   onToggleConversationsColumn?: () => void;
+  onResolveConversation?: (conversationId: string) => void;
+  onReopenConversation?: (conversationId: string) => void;
+  onCreateConversation?: (inboxId: string, contactId: string) => void;
   isLoading?: boolean;
   hasMoreMessages?: boolean;
   onLoadMore?: () => void;
@@ -62,12 +71,18 @@ interface ChatAreaProps {
 
 export function ChatArea({
   contact,
+  conversationId,
+  conversationStatus,
+  inboxId,
   messages,
   onSendMessage,
   onToggleContactPanel,
   isContactPanelOpen,
   isConversationsColumnOpen = true,
   onToggleConversationsColumn,
+  onResolveConversation,
+  onReopenConversation,
+  onCreateConversation,
   isLoading,
   hasMoreMessages,
   onLoadMore,
@@ -231,6 +246,25 @@ export function ChatArea({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {conversationStatus !== "resolved" && conversationId && onResolveConversation && (
+                <DropdownMenuItem onClick={() => onResolveConversation(conversationId)}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Resolver conversa
+                </DropdownMenuItem>
+              )}
+              {conversationStatus === "resolved" && conversationId && onReopenConversation && (
+                <DropdownMenuItem onClick={() => onReopenConversation(conversationId)}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reabrir conversa
+                </DropdownMenuItem>
+              )}
+              {inboxId && contact?.id && onCreateConversation && (
+                <DropdownMenuItem onClick={() => onCreateConversation(inboxId, contact.id)}>
+                  <MessageCirclePlus className="h-4 w-4 mr-2" />
+                  Nova conversa com contato
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
               <DropdownMenuItem>
                 <Phone className="h-4 w-4 mr-2" />
                 Ligar
